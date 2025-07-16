@@ -15,6 +15,19 @@ def transcribe_audio(file_path):
         )
     return transcript.text  # check your response structure if error
 
+def format_transcription(text):
+    response = client.chat.completions.create(
+        model="gpt-4.1-nano-2025-04-14",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant that formats audio transcripts."},
+            {"role": "user",
+             "content": f"Add punctuation to this transcript, including paragraphing:\n{text}"}
+        ],
+        temperature=0.5,
+        max_tokens=500
+    )
+    return response.choices[0].message.content.strip()
+
 def summarize_text(text):
     response = client.chat.completions.create(
         model="gpt-4.1-nano-2025-04-14",
@@ -27,13 +40,16 @@ def summarize_text(text):
     )
     return response.choices[0].message.content.strip()
 
-def generate_pdf(summary, output_path):
+def generate_pdf_summary(text, output_path):
+    safe_text = text.replace("—", "-") # Replace unicode dashes
+    safe_text = safe_text.encode('latin-1', errors='replace').decode('latin-1') # replace any other dodgy characters
+
     pdf = FPDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
 
-    split_summary = summary.split('\n')
-    # print(split_summary)  # optional debugging
+
+    split_summary = safe_text.split('\n')
 
     pdf.set_font("Arial", "B", 16)
     pdf.cell(0, 10, split_summary[0], ln=True, align="C")
@@ -43,8 +59,29 @@ def generate_pdf(summary, output_path):
         pdf.multi_cell(0, 6, line)
     pdf.output(output_path)
 
-def audio_to_pdf_summary(audio_path, pdf_path):
-    transcript = transcribe_audio(audio_path)
+def generate_pdf_transcription(text, output_path):
+    safe_text = text.replace("—", "-")  # Replace unicode dashes
+    safe_text = safe_text.encode('latin-1', errors='replace').decode('latin-1')  # replace any other dodgy characters
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    split_summary = safe_text.split('\n')
+
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, "Transcription", ln=True, align="C")
+
+    pdf.set_font("Arial", size=12)
+    for line in split_summary:
+        pdf.multi_cell(0, 6, line)
+    pdf.output(output_path)
+
+def audio_to_pdf_summary(transcript, pdf_path):
     summary = summarize_text(transcript)
-    generate_pdf(summary, pdf_path)
-    print("PDF Summary saved to:", pdf_path)
+    generate_pdf_summary(summary, pdf_path)
+
+def audio_to_pdf_transcript(transcript, pdf_path):
+    formatted_transcript = format_transcription(transcript)
+    generate_pdf_transcription(formatted_transcript, pdf_path)
+
