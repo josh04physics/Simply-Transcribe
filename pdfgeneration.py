@@ -17,7 +17,7 @@ def transcribe_audio(file_path):
 
 def summarize_text(text):
     response = client.chat.completions.create(
-        model="gpt-4",
+        model="gpt-4.1-nano-2025-04-14",
         messages=[
             {"role": "system", "content": "You are a helpful assistant that summarizes audio transcripts."},
             {"role": "user", "content": f"Summarize this transcript in under 500 words. The first line should be the title.:\n{text}"}
