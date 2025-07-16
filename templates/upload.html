@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Audio to PDF Generator</title>
+    <style>
+        #loading {
+            display: none;
+            font-weight: bold;
+            font-size: 1.2em;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>Upload Audio File</h1>
+
+    <form id="upload-form" method="POST" action="/upload" enctype="multipart/form-data">
+        <input type="file" name="audio_file" accept="audio/*" required>
+        <button type="submit">Generate PDF</button>
+    </form>
+
+    <div id="loading">Generating PDF, please wait...</div>
+
+    <script>
+        const form = document.getElementById('upload-form');
+        const loadingDiv = document.getElementById('loading');
+
+        form.addEventListener('submit', () => {
+            loadingDiv.style.display = 'block';
+        });
+    </script>
+</body>
+</html>
