@@ -33,8 +33,34 @@
 
         h1 {
             font-size: 1.8em;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
             color: #222;
+        }
+
+        /* Buttons container */
+        .auth-buttons {
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+        }
+
+        .auth-buttons a {
+            text-decoration: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-weight: 600;
+            color: white;
+            background-color: #4a90e2;
+            transition: background 0.3s ease;
+        }
+
+        .auth-buttons a.register-btn {
+            background-color: #28a745; /* green */
+        }
+
+        .auth-buttons a:hover {
+            filter: brightness(0.85);
         }
 
         input[type="file"] {
@@ -79,6 +105,11 @@
 <body>
     <div class="container">
         <h1>Audio to PDF Summary Generator</h1>
+
+        <div class="auth-buttons">
+            <a href="{{ url_for('login') }}">Login</a>
+            <a href="{{ url_for('register') }}" class="register-btn">Register</a>
+        </div>
 
         <form id="upload-form" method="POST" action="/upload" enctype="multipart/form-data">
             <input type="file" name="audio_file" accept="audio/*" required>
