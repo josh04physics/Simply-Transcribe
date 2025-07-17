@@ -9,12 +9,46 @@ from models import db
 from models.user import User
 from forms.forms import RegisterForm, LoginForm
 from flask_bcrypt import Bcrypt
+import sys
+from pydub.utils import which
+from pydub import AudioSegment
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['SECRET_KEY'] = 'your_secret_key'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 db.init_app(app)
+
+
+def set_ffmpeg_path():
+    # Detect OS platform
+    if sys.platform == "win32":
+        # Windows: expect ffmpeg.exe in bin folder
+        ffmpeg_path = os.path.join(os.path.dirname(__file__), "bin", "ffmpeg.exe")
+        if not os.path.isfile(ffmpeg_path):
+            # fallback to system ffmpeg if local binary missing
+            ffmpeg_path = which("ffmpeg")
+    else:
+        # Linux/Mac: expect ffmpeg static binary in bin folder
+        ffmpeg_path = os.path.join(os.path.dirname(__file__), "bin", "ffmpeg")
+        if not os.path.isfile(ffmpeg_path):
+            # fallback to system ffmpeg if local binary missing
+            ffmpeg_path = which("ffmpeg")
+
+    if ffmpeg_path is None:
+        raise RuntimeError("FFmpeg binary not found! Please provide ffmpeg in bin/ or install globally.")
+
+    AudioSegment.converter = ffmpeg_path
+
+# Call this early in your app startup
+set_ffmpeg_path()
+
+
+
+
+
+
+
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 login_manager = LoginManager()

@@ -6,8 +6,9 @@ from dotenv import load_dotenv
 from pydub import AudioSegment
 import tempfile
 
-# Use the static ffmpeg binary in your project folder (bin/ffmpeg)
-AudioSegment.converter = os.path.join(os.path.dirname(__file__), "bin", "ffmpeg")
+
+
+
 
 load_dotenv()
 client = OpenAI()
