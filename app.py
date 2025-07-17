@@ -1,5 +1,6 @@
 from flask import Flask, request, render_template, send_file, url_for, redirect, flash, request
-from flask_login import login_user, login_required, logout_user, LoginManager
+from flask_login import login_user, login_required, logout_user, LoginManager, current_user
+from flask_migrate import Migrate
 import os
 from pdfgeneration import audio_to_pdf_summary, audio_to_pdf_transcript, transcribe_audio
 import zipfile
@@ -21,6 +22,8 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 
 bcrypt = Bcrypt(app)
+
+migrate = Migrate(app, db) # To allow columns to be added using terminal
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -58,8 +61,14 @@ def load_user(user_id):
 
 @app.route('/')
 @login_required
-def index():
-    return render_template('upload.html')
+def index(): # MAIN HOMEPAGE
+    if current_user.is_authenticated:
+        username = current_user.username
+        credits = current_user.credits
+    else:
+        username = None
+        credits= None
+    return render_template('upload.html', username=username, credits=credits)
 
 @app.route('/upload', methods=['POST'])
 def upload_file():

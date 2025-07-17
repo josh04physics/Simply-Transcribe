@@ -15,10 +15,28 @@
             padding: 0;
             background: #f4f6f9;
             display: flex;
+            flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             min-height: 100vh;
             color: #333;
+        }
+
+        /* User Icon and Username container */
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            width: 100%;
+            max-width: 400px;
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #222;
+        }
+
+        .user-info .icon {
+            font-size: 1.6em;
         }
 
         .container {
@@ -29,6 +47,7 @@
             text-align: center;
             width: 100%;
             max-width: 400px;
+            margin-top: 10px;
         }
 
         h1 {
@@ -103,6 +122,15 @@
     </style>
 </head>
 <body>
+    <div class="user-info">
+        <div class="icon">👤</div>
+        {% if username %}
+            <div>{{ username }} (Credits: {{ credits }})</div></div>
+        {% else %}
+            <div>Guest</div>
+        {% endif %}
+    </div>
+
     <div class="container">
         <h1>Audio to PDF Summary Generator</h1>
 
