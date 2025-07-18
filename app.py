@@ -3,6 +3,7 @@ import time
 import queue
 from flask_login import login_user, login_required, logout_user, LoginManager, current_user
 from flask_migrate import Migrate
+from flask_sqlalchemy import SQLAlchemy
 import os
 from pdfgeneration import audio_to_pdf_summary, audio_to_pdf_transcript, transcribe_audio
 import zipfile
@@ -14,22 +15,40 @@ from flask_bcrypt import Bcrypt
 import sys
 from pydub.utils import which
 from pydub import AudioSegment
-import os
 from dotenv import load_dotenv
+
+
+load_dotenv()
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['SECRET_KEY'] = 'your_secret_key'
 
-
-database_url = os.environ.get("DATABASE_URL") # Manage database stored on disk
-if not database_url:
-    os.makedirs(app.instance_path, exist_ok=True)  # Ensure folder exists
-    database_url = f"sqlite:///{os.path.join(app.instance_path, 'users.db')}"
-
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-
 db.init_app(app)
+
+# 1. Set DATABASE_URL from environment or default to local instance folder
+database_url = os.environ.get("DATABASE_URL")
+
+if not database_url:
+    os.makedirs(app.instance_path, exist_ok=True)
+    db_path = os.path.join(app.instance_path, 'users.db')
+    database_url = f"sqlite:///{db_path}"
+else:
+    # Extract file path from DATABASE_URL
+    db_path = database_url.replace("sqlite:///", "")
+
+# 2. Configure SQLAlchemy
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# 3. Create DB if it doesn't exist
+if not os.path.exists(db_path):
+    with app.app_context():
+        db.create_all()
+        print("✅ Created new database at", db_path)
+
+
+
 
 progress_queue = queue.Queue() # for real time updates on pdf generation
 
