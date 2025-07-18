@@ -133,27 +133,45 @@ def index(): # MAIN HOMEPAGE
 @login_required
 def upload_file():
     if 'audio_file' not in request.files:
-        return "No file part", 400
+        flash("No file part", "danger")
+        return redirect(url_for('index'))
 
     file = request.files['audio_file']
     if file.filename == '':
-        return "No selected file", 400
+        flash("No selected file", "danger")
+        return redirect(url_for('index'))
 
     audio_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
     file.save(audio_path)
 
+    # --- STEP 1: Calculate duration in minutes using pydub ---
+    try:
+        audio = AudioSegment.from_file(audio_path)
+        duration_minutes = max(1, -(-len(audio) // 60000))  # ceil in ms
+    except Exception as e:
+        flash(f"Failed to read audio: {str(e)}", "danger")
+        return redirect(url_for('index'))
+
+    # --- STEP 2: Check if user has enough credits ---
+    if current_user.credits < duration_minutes:
+        flash(f"You need {duration_minutes} credits, but you only have {current_user.credits}.", "warning")
+        return redirect(url_for('index'))
+
+    # --- STEP 3: Deduct credits ---
+    current_user.credits -= duration_minutes
+    db.session.commit()
+
+    # --- STEP 4: Proceed with transcription ---
     pdf_filename = os.path.splitext(file.filename)[0] + '.pdf'
     transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{pdf_filename}-transcript")
     summary_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{pdf_filename}-summary")
 
-    # Use progress-callback-enabled versions
     transcript = transcribe_audio(audio_path, progress_callback)
     audio_to_pdf_transcript(transcript, transcript_path, progress_callback)
     audio_to_pdf_summary(transcript, summary_path, progress_callback)
-
     progress_callback("[DONE]")
 
-    # Create in-memory ZIP for download
+    # Create ZIP for download
     memory_file = io.BytesIO()
     with zipfile.ZipFile(memory_file, 'w') as zf:
         zf.write(transcript_path, arcname='transcript.pdf')

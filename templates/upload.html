@@ -151,6 +151,7 @@
             <input type="file" name="audio_file" accept="audio/*" required>
             <br>
             <button type="submit">Generate PDF</button>
+            <p id="cost-estimate" style="margin-top: 10px; font-size: 0.95em; color: #444;"></p>
         </form>
 
         <div id="loading" style="margin-top: 20px; font-weight: bold; font-size: 0.8em; color: #e2544a; display: none;">
@@ -158,28 +159,41 @@
 </div>
     </div>
 
-    <script>
-    const form = document.getElementById('upload-form');
-    const loadingDiv = document.getElementById('loading');
-    const progressDiv = document.getElementById('progress-messages');
+   <script>
+            const form = document.getElementById('upload-form');
+            const fileInput = document.querySelector('input[name="audio_file"]');
+            const costEstimate = document.getElementById('cost-estimate');
+            const loadingDiv = document.getElementById('loading');
+            const progressDiv = document.getElementById('progress-messages');
 
-    form.addEventListener('submit', () => {
-        loadingDiv.style.display = 'block';
-        progressDiv.innerText = "Uploading file...";
+            // Estimate duration using file size (approximation)
+            // Assumes 1MB ≈ 1 minute for compressed formats like MP3 (128kbps)
+            fileInput.addEventListener('change', () => {
+                const file = fileInput.files[0];
+                if (file) {
+                    const sizeInMB = file.size / (1024 * 1024);
+                    const estimatedMinutes = Math.max(1, Math.ceil(sizeInMB)); // round up
+                    costEstimate.textContent = `Estimated credit cost: ${estimatedMinutes} credit${estimatedMinutes > 1 ? 's' : ''}`;
+                } else {
+                    costEstimate.textContent = '';
+                }
+            });
 
-        // Start streaming progress updates
-        const eventSource = new EventSource('/progress');
+            form.addEventListener('submit', () => {
+                loadingDiv.style.display = 'block';
+                progressDiv.innerText = "Uploading file...";
 
-        eventSource.onmessage = function(event) {
-            if (event.data === "[DONE]") {
-                eventSource.close();
-                progressDiv.innerText += "\n✅ Done! Preparing your download...";
-            } else {
-                progressDiv.innerText += "\n" + event.data;
-            }
-            progressDiv.scrollTop = progressDiv.scrollHeight;
-        };
-    });
+                const eventSource = new EventSource('/progress');
+                eventSource.onmessage = function(event) {
+                    if (event.data === "[DONE]") {
+                        eventSource.close();
+                        progressDiv.innerText += "\n✅ Done! Preparing your download...";
+                    } else {
+                        progressDiv.innerText += "\n" + event.data;
+                    }
+                    progressDiv.scrollTop = progressDiv.scrollHeight;
+                };
+            });
 </script>
 </body>
 </html>
