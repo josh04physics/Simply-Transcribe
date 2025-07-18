@@ -24,8 +24,6 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['SECRET_KEY'] = 'your_secret_key'
 
-db.init_app(app)
-
 # 1. Set DATABASE_URL from environment or default to local instance folder
 database_url = os.environ.get("DATABASE_URL")
 
@@ -40,6 +38,8 @@ else:
 # 2. Configure SQLAlchemy
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db.init_app(app) # order matters of this, must be called after config but before creation.
 
 # 3. Create DB if it doesn't exist
 if not os.path.exists(db_path):
