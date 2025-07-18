@@ -14,14 +14,25 @@ from flask_bcrypt import Bcrypt
 import sys
 from pydub.utils import which
 from pydub import AudioSegment
+import os
+from dotenv import load_dotenv
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['SECRET_KEY'] = 'your_secret_key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+
+
+database_url = os.environ.get("DATABASE_URL") # Manage database stored on disk
+if not database_url:
+    os.makedirs(app.instance_path, exist_ok=True)  # Ensure folder exists
+    database_url = f"sqlite:///{os.path.join(app.instance_path, 'users.db')}"
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+
 db.init_app(app)
 
 progress_queue = queue.Queue() # for real time updates on pdf generation
+
 
 def progress_callback(message):
     progress_queue.put(message)
