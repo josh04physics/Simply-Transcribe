@@ -1,4 +1,6 @@
-from flask import Flask, request, render_template, send_file, url_for, redirect, flash, request
+from flask import Flask, request, render_template, send_file, url_for, redirect, flash, Response, stream_with_context
+import time
+import queue
 from flask_login import login_user, login_required, logout_user, LoginManager, current_user
 from flask_migrate import Migrate
 import os
@@ -18,6 +20,12 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['SECRET_KEY'] = 'your_secret_key'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 db.init_app(app)
+
+progress_queue = queue.Queue() # for real time updates on pdf generation
+
+def progress_callback(message):
+    progress_queue.put(message)
+
 
 
 def set_ffmpeg_path():
@@ -45,11 +53,6 @@ set_ffmpeg_path()
 
 
 
-
-
-
-
-
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -58,6 +61,28 @@ login_manager.login_view = 'login'
 bcrypt = Bcrypt(app)
 
 migrate = Migrate(app, db) # To allow columns to be added using terminal
+
+
+
+
+def stream_progress():
+    while True:
+        message = progress_queue.get()
+        yield f"data: {message}\n\n"
+        if message == "[DONE]":
+            break
+
+@app.route("/progress")
+def progress():
+    def generate():
+        while True:
+            message = progress_queue.get()
+            yield f"data: {message}\n\n"
+            if message == "[DONE]":
+                break
+    return Response(stream_with_context(generate()), content_type='text/event-stream')
+
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -105,6 +130,7 @@ def index(): # MAIN HOMEPAGE
     return render_template('upload.html', username=username, credits=credits)
 
 @app.route('/upload', methods=['POST'])
+@login_required
 def upload_file():
     if 'audio_file' not in request.files:
         return "No file part", 400
@@ -120,12 +146,14 @@ def upload_file():
     transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{pdf_filename}-transcript")
     summary_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{pdf_filename}-summary")
 
-    # Call your actual audio-to-PDF function here
-    transcript = transcribe_audio(audio_path) # Done here so that transcription done only once
-    audio_to_pdf_transcript(transcript, transcript_path)
-    audio_to_pdf_summary(transcript, summary_path)
+    # Use progress-callback-enabled versions
+    transcript = transcribe_audio(audio_path, progress_callback)
+    audio_to_pdf_transcript(transcript, transcript_path, progress_callback)
+    audio_to_pdf_summary(transcript, summary_path, progress_callback)
 
-    # Create an in-memory ZIP file
+    progress_callback("[DONE]")
+
+    # Create in-memory ZIP for download
     memory_file = io.BytesIO()
     with zipfile.ZipFile(memory_file, 'w') as zf:
         zf.write(transcript_path, arcname='transcript.pdf')
@@ -133,6 +161,7 @@ def upload_file():
     memory_file.seek(0)
 
     return send_file(memory_file, as_attachment=True, download_name='audio_outputs.zip')
+
 
 if __name__ == '__main__':
     print(db)

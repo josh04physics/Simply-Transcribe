@@ -10,6 +10,14 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
+
+        #progress-messages {
+        white-space: pre-wrap;
+        max-height: 300px;
+        overflow-y: auto;
+
+        }
+
         body {
             margin: 0;
             padding: 0;
@@ -145,16 +153,33 @@
             <button type="submit">Generate PDF</button>
         </form>
 
-        <div id="loading">Generating PDF, please wait...</div>
+        <div id="loading" style="margin-top: 20px; font-weight: bold; font-size: 0.8em; color: #e2544a; display: none;">
+    <div id="progress-messages">Generating PDF, please wait...</div>
+</div>
     </div>
 
     <script>
-        const form = document.getElementById('upload-form');
-        const loadingDiv = document.getElementById('loading');
+    const form = document.getElementById('upload-form');
+    const loadingDiv = document.getElementById('loading');
+    const progressDiv = document.getElementById('progress-messages');
 
-        form.addEventListener('submit', () => {
-            loadingDiv.style.display = 'block';
-        });
-    </script>
+    form.addEventListener('submit', () => {
+        loadingDiv.style.display = 'block';
+        progressDiv.innerText = "Uploading file...";
+
+        // Start streaming progress updates
+        const eventSource = new EventSource('/progress');
+
+        eventSource.onmessage = function(event) {
+            if (event.data === "[DONE]") {
+                eventSource.close();
+                progressDiv.innerText += "\n✅ Done! Preparing your download...";
+            } else {
+                progressDiv.innerText += "\n" + event.data;
+            }
+            progressDiv.scrollTop = progressDiv.scrollHeight;
+        };
+    });
+</script>
 </body>
 </html>
