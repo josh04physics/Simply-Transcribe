@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, send_file, url_for, redirect, flash, Response, stream_with_context
+from flask import Flask, request, render_template, send_file, url_for, redirect, flash, Response, stream_with_context, jsonify
 import time
 import queue
 from flask_login import login_user, login_required, logout_user, LoginManager, current_user
@@ -16,15 +16,22 @@ import sys
 from pydub.utils import which
 from pydub import AudioSegment
 from dotenv import load_dotenv
+import stripe
 
 
-load_dotenv()
+load_dotenv("stripedata.env")
+#load_dotenv("database.env")
+
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['SECRET_KEY'] = 'your_secret_key'
 
-# 1. Set DATABASE_URL from environment or default to local instance folder
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY") # get stripe data (different locally and on render)
+YOUR_DOMAIN = os.getenv("YOUR_DOMAIN")  # e.g. https://yourdomai
+
+
+# 1. Set DATABASE_URL from environment or default to local instance folder RIGHT NOW IT DEFAULTS - FIX THIS
 database_url = os.environ.get("DATABASE_URL")
 
 if not database_url:
@@ -112,7 +119,80 @@ def progress():
                 break
     return Response(stream_with_context(generate()), content_type='text/event-stream')
 
+@app.route('/buy-credits', methods=['GET', 'POST'])
+@login_required
+def buy_credits():
+    MIN_CREDITS = 20  # Minimum credits required to purchase
 
+    if request.method == 'POST':
+        try:
+            credits_to_buy = int(request.form.get('credits'))
+            if credits_to_buy < MIN_CREDITS:
+                flash(f'You must purchase at least {MIN_CREDITS} credits.', 'warning')
+                return redirect(url_for('buy_credits'))
+        except (TypeError, ValueError):
+            flash('Invalid input for credits.', 'warning')
+            return redirect(url_for('buy_credits'))
+
+        price_per_credit_cents = 2
+        amount_to_charge = credits_to_buy * price_per_credit_cents
+
+        session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': f'{credits_to_buy} Credits',
+                    },
+                    'unit_amount': price_per_credit_cents,
+                },
+                'quantity': credits_to_buy,
+            }],
+            mode='payment',
+            success_url=YOUR_DOMAIN + url_for('payment_success', _external=False) + '?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=YOUR_DOMAIN + url_for('buy_credits', _external=False),
+            client_reference_id=current_user.id,
+        )
+
+        return redirect(session.url, code=303)
+
+    return render_template('buy_credits.html')
+
+
+@app.route('/payment-success')
+@login_required
+def payment_success():
+    session_id = request.args.get('session_id')
+    if not session_id:
+        flash('Missing payment session ID.', 'danger')
+        return redirect(url_for('buy_credits'))
+
+    session = stripe.checkout.Session.retrieve(session_id)
+    if session.payment_status != 'paid':
+        flash('Payment was not successful.', 'danger')
+        return redirect(url_for('buy_credits'))
+
+    # Check if credits already added to avoid double credits on refresh
+    if getattr(current_user, 'credits_purchased', None) != session.id:
+        # Add credits to user (based on line_items quantity)
+        # Stripe does not return line_items by default, fetch them:
+        line_items = stripe.checkout.Session.list_line_items(session_id)
+        total_credits = 0
+        for item in line_items.data:
+            total_credits += item.quantity
+
+        current_user.credits += total_credits
+        # Store session id on user to prevent double adding (optional)
+        current_user.credits_purchased = session.id
+        db.session.commit()
+
+        flash(f'Successfully added {total_credits} credits to your account!', 'success')
+
+    else:
+        flash('Credits already added for this purchase.', 'info')
+
+    return redirect(url_for('index'))
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -141,7 +221,8 @@ def login():
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('login'))
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('index'))
 
 
 @login_manager.user_loader
@@ -149,7 +230,6 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 @app.route('/')
-@login_required
 def index(): # MAIN HOMEPAGE
     if current_user.is_authenticated:
         username = current_user.username

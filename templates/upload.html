@@ -142,10 +142,16 @@
     <div class="container">
         <h1>Audio to PDF Summary Generator</h1>
 
-        <div class="auth-buttons">
-            <a href="{{ url_for('login') }}">Login</a>
-            <a href="{{ url_for('register') }}" class="register-btn">Register</a>
-        </div>
+                <div class="auth-buttons">
+    {% if current_user.is_authenticated %}
+        <a href="{{ url_for('buy_credits') }}">Buy Credits</a>
+        <a href="{{ url_for('logout') }}" style="background-color: #dc3545;">Logout</a>
+    {% else %}
+        <a href="{{ url_for('login') }}">Login</a>
+        <a href="{{ url_for('register') }}" class="register-btn">Register</a>
+        <a href="{{ url_for('buy_credits') }}">Buy Credits</a>
+    {% endif %}
+</div>
 
         <form id="upload-form" method="POST" action="/upload" enctype="multipart/form-data">
             <input type="file" name="audio_file" accept="audio/*" required>
@@ -157,7 +163,32 @@
         <div id="loading" style="margin-top: 20px; font-weight: bold; font-size: 0.8em; color: #e2544a; display: none;">
     <div id="progress-messages">Generating PDF, please wait...</div>
 </div>
+
     </div>
+    <!-- FAQ Section -->
+<div style="max-width: 600px; width: 90%; margin: 3em auto;">
+    <h2 style="text-align: center; color: #222;">Frequently Asked Questions</h2>
+
+    <details style="margin-top: 1em; padding: 1em; background: #fff; border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.1);">
+        <summary><strong>What are credits used for?</strong></summary>
+        <p>Credits are used to transcribe and summarize audio. 1 minute = 1 credit.</p>
+    </details>
+
+    <details style="margin-top: 1em; padding: 1em; background: #fff; border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.1);">
+        <summary><strong>How many credits do I need?</strong></summary>
+        <p>It depends on the audio length. A 10-minute file needs 10 credits.</p>
+    </details>
+
+    <details style="margin-top: 1em; padding: 1em; background: #fff; border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.1);">
+        <summary><strong>Do credits expire?</strong></summary>
+        <p>No, your purchased credits never expire.</p>
+    </details>
+
+    <details style="margin-top: 1em; padding: 1em; background: #fff; border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.1);">
+        <summary><strong>How is audio transcribed and summarised?</strong></summary>
+        <p>Audio is transcribed using Open AIs whisper model, and then formatted and summarised using ChatGPT 3.5 Turbo.</p>
+    </details>
+</div>
 
    <script>
             const form = document.getElementById('upload-form');

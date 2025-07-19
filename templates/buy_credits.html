@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Buy Credits</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f8;
+            padding: 2em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            background-color: white;
+            padding: 2em 3em;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 100%;
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 1.5em;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5em;
+            font-weight: 600;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 0.6em;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-size: 1em;
+            margin-bottom: 1.2em;
+        }
+
+        button {
+            width: 100%;
+            padding: 0.7em;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .flashes {
+            margin-top: 1em;
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        .flash {
+            padding: 0.75em;
+            margin-bottom: 0.5em;
+            border-radius: 6px;
+            font-size: 0.95em;
+        }
+
+        .flash.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .flash.warning {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .flash.danger {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .flash.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+<a href="{{ url_for('index') }}" style="
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    padding: 8px 14px;
+    background: #4a90e2;
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+    border-radius: 6px;">
+    🏠 Home
+</a>
+
+    <div class="container">
+        <h2>Buy Credits</h2>
+
+        <form method="POST">
+            <label for="credits">Credits to purchase (min 20):</label>
+            <input type="number" id="credits" name="credits" min="20" required>
+            <button type="submit">Buy Credits</button>
+        </form>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <ul class="flashes">
+      {% for category, message in messages %}
+        {# Skip logout/login prompt messages #}
+        {% if "logged out" not in message.lower() and "please log in" not in message.lower() %}
+          <li class="flash {{ category }}">{{ message }}</li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+    </div>
+
+ <h3 style="margin-top: 2em;">Credit Cost Breakdown</h3>
+<table style="width: 100%; border-collapse: collapse; margin-top: 1em;">
+  <thead>
+    <tr style="background-color: #f2f2f2;">
+      <th style="padding: 0.75em; border: 1px solid #ccc; text-align: left;">Credits</th>
+      <th style="padding: 0.75em; border: 1px solid #ccc; text-align: left;">Price (USD)</th>
+      <th style="padding: 0.75em; border: 1px solid #ccc; text-align: left;">What you can do</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="padding: 0.75em; border: 1px solid #ccc;">20 credits</td>
+      <td style="padding: 0.75em; border: 1px solid #ccc;">$0.40</td>
+      <td style="padding: 0.75em; border: 1px solid #ccc;">Transcribe and summarise ~20 minutes of audio</td>
+    </tr>
+    <tr>
+      <td style="padding: 0.75em; border: 1px solid #ccc;">50 credits</td>
+      <td style="padding: 0.75em; border: 1px solid #ccc;">$1.00</td>
+      <td style="padding: 0.75em; border: 1px solid #ccc;">Transcribe and summarise ~50 minutes of audio</td>
+    </tr>
+    <tr>
+      <td style="padding: 0.75em; border: 1px solid #ccc;">100 credits</td>
+      <td style="padding: 0.75em; border: 1px solid #ccc;">$2.00</td>
+      <td style="padding: 0.75em; border: 1px solid #ccc;">Transcribe and summarise ~1 hour and 40 minutes of audio</td>
+    </tr>
+  </tbody>
+</table>
+
+</body>
+</html>
