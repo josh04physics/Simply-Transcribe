@@ -5,7 +5,7 @@ from flask_login import login_user, login_required, logout_user, LoginManager, c
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 import os
-from pdfgeneration import audio_to_pdf_summary, audio_to_pdf_transcript, transcribe_audio
+from pdfgeneration import generate_summary_from_base_transcript, generate_formatted_transcript_from_base_transcript, transcribe_audio, generate_math_pdf_from_transcipt
 import zipfile
 import io
 from models import db
@@ -273,12 +273,17 @@ def upload_file():
 
     # --- STEP 4: Proceed with transcription ---
     pdf_filename = os.path.splitext(file.filename)[0] + '.pdf'
-    transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{pdf_filename}-transcript")
+    transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{pdf_filename}-transcript") # countintuitive labelling - fix
     summary_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{pdf_filename}-summary")
+    math_transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{pdf_filename}-math_transcript/Math_Transcription.pdf") # temp fix.. ?
+
 
     transcript = transcribe_audio(audio_path, progress_callback)
-    audio_to_pdf_transcript(transcript, transcript_path, progress_callback)
-    audio_to_pdf_summary(transcript, summary_path, progress_callback)
+
+
+    generate_math_pdf_from_transcipt(transcript,math_transcript_path, progress_callback)
+    generate_formatted_transcript_from_base_transcript(transcript, transcript_path, progress_callback) # counterintuitive labelling - fix
+    generate_summary_from_base_transcript(transcript, summary_path, progress_callback)
     progress_callback("[DONE]")
 
     # Create ZIP for download
@@ -286,6 +291,7 @@ def upload_file():
     with zipfile.ZipFile(memory_file, 'w') as zf:
         zf.write(transcript_path, arcname='transcript.pdf')
         zf.write(summary_path, arcname='summary.pdf')
+        zf.write(math_transcript_path, arcname="math-transcript.pdf")
     memory_file.seek(0)
 
     return send_file(memory_file, as_attachment=True, download_name='audio_outputs.zip')
@@ -294,4 +300,3 @@ def upload_file():
 if __name__ == '__main__':
     print(db)
     app.run(debug=True)
-
