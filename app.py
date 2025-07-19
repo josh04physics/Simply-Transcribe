@@ -267,9 +267,7 @@ def upload_file():
     pdf_filename = os.path.splitext(file.filename)[0] + '.pdf'
     transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{pdf_filename}-transcript") # countintuitive labelling - fix
     summary_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{pdf_filename}-summary")
-    math_transcript_dir = os.path.join(app.config['UPLOAD_FOLDER'], f"{pdf_filename}-math_transcript")
-    os.makedirs(math_transcript_dir, exist_ok=True)
-    math_transcript_path = os.path.join(math_transcript_dir, "Math_Transcription.pdf")
+    math_transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{pdf_filename}-math_transcript")
 
 
     transcript = transcribe_audio(audio_path, progress_callback)
