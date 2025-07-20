@@ -89,7 +89,7 @@ def summarise_text_from_transcipt(text, progress_callback=None):
             model="gpt-3.5-turbo-16k",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that summarizes transcripts."},
-                {"role": "user", "content": f"Summarize this part of a transcript into bullet points:\n{chunk}"}
+                {"role": "user", "content": f"Summarize this part of a transcript into a paragraph:\n{chunk}"}
             ],
             temperature=0.5,
             max_tokens=800
@@ -105,7 +105,7 @@ def summarise_text_from_transcipt(text, progress_callback=None):
         model="gpt-3.5-turbo-16k",
         messages=[
             {"role": "system", "content": "You are a helpful assistant that summarizes summaries."},
-            {"role": "user", "content": f"Combine and refine this summary into a single piece of bullet points. The first line should be a title of no more than 9 words.:\n{combined}"}
+            {"role": "user", "content": f"Combine and refine this summary into a few paragraphs. The first line should be a title of no more than 9 words.:\n{combined}"}
         ],
         temperature=0.5,
         max_tokens=800

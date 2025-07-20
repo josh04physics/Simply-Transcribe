@@ -1,331 +1,365 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Summary Sound</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
-  <style>
-    * {
-      box-sizing: border-box;
-      font-family: 'Inter', sans-serif;
-    }
+    <meta charset="UTF-8">
+    <title>Summary Sound</title>
+    <style>
+        /* Base Styles */
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
 
-    body {
-      margin: 0;
-      padding: 0;
-      background: #eef1f6;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding-top: 64px;
-      color: #333;
-    }
 
-    .header-bar {
-      position: fixed;
-      top: 0;
-      width: 100%;
-      background: #2d5be3;
-      color: white;
-      padding: 12px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-weight: 600;
-      font-size: 1.1rem;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      z-index: 1000;
-    }
+        #progress-messages {
+        white-space: pre-wrap;
+        max-height: 300px;
+        overflow-y: auto;
 
-    .container {
-      background: #fff;
-      padding: 36px;
-      border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-      max-width: 480px;
-      width: 90%;
-      margin-top: 24px;
-    }
+        }
 
-    h1 {
-      font-size: 1.7rem;
-      margin-bottom: 20px;
-      color: #222;
-    }
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f4f6f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            color: #333;
+            padding-top: 48px; /* Prevent content hiding behind fixed header */
+        }
 
-    .user-info {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 600;
-      margin: 1rem auto 0;
-    }
+        /* User Icon and Username container */
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            width: 100%;
+            max-width: 400px;
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #222;
+        }
 
-    .auth-buttons {
-      display: flex;
-      justify-content: center;
-      gap: 12px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-    }
+        .user-info .icon {
+            font-size: 1.6em;
+        }
 
-    .auth-buttons a {
-      text-decoration: none;
-      padding: 10px 16px;
-      border-radius: 10px;
-      font-weight: 600;
-      color: white;
-      background-color: #4a90e2;
-      transition: all 0.2s ease-in-out;
-    }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 100%;
+            max-width: 400px;
+            margin-top: 10px;
+        }
 
-    .auth-buttons a:hover {
-      opacity: 0.9;
-    }
+        h1 {
+            font-size: 1.8em;
+            margin-bottom: 16px;
+            color: #222;
+        }
 
-    input[type="file"] {
-      width: 100%;
-      padding: 14px;
-      border: 2px dashed #bbb;
-      border-radius: 12px;
-      background: #f9f9f9;
-      cursor: pointer;
-      margin: 16px 0;
-    }
+        /* Buttons container */
+        .auth-buttons {
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+        }
 
-    button[type="submit"] {
-      width: 100%;
-      background-color: #28a745;
-      color: white;
-      border: none;
-      padding: 14px;
-      font-size: 1rem;
-      border-radius: 10px;
-      cursor: pointer;
-      margin-top: 8px;
-      transition: background 0.2s ease-in-out;
-    }
+        .auth-buttons a {
+            text-decoration: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-weight: 600;
+            color: white;
+            background-color: #4a90e2;
+            transition: background 0.3s ease;
+        }
 
-    button[type="submit"]:hover {
-      background-color: #218838;
-    }
+        .auth-buttons a.register-btn {
+            background-color: #4a90e2; /* same blue as login */
+            }
 
-    #cost-estimate {
-      font-size: 0.95rem;
-      color: #555;
-      margin-bottom: 16px;
-    }
+        .auth-buttons a:hover {
+            filter: brightness(0.85);
+        }
 
-    .checkbox-group {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      flex-wrap: wrap;
-      margin: 16px 0;
-    }
+        input[type="file"] {
+            margin: 20px 0;
+            padding: 12px;
+            width: 100%;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            background: #fafafa;
+            cursor: pointer;
+            transition: border 0.3s ease;
+        }
 
-    .custom-checkbox {
-      position: relative;
-      padding-left: 30px;
-      cursor: pointer;
-      font-weight: 600;
-      user-select: none;
-      font-size: 1rem;
-    }
+        input[type="file"]:hover {
+            border-color: #777;
+        }
 
-    .custom-checkbox input {
-      position: absolute;
-      opacity: 0;
-    }
+                button {
+            background-color: #28a745;
+            color: white;
+            padding: 12px 20px;
+            font-size: 1em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
 
-    .custom-checkbox .checkmark {
-      position: absolute;
-      top: 2px;
-      left: 0;
-      height: 20px;
-      width: 20px;
-      background-color: #e1e4ea;
-      border-radius: 6px;
-      transition: background-color 0.2s ease-in-out;
-    }
+        button:hover {
+            background-color: #218838;
+        }
 
-    .custom-checkbox input:checked ~ .checkmark {
-      background-color: #4a90e2;
-    }
+        #loading {
+            margin-top: 20px;
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #4a90e2;
+            display: none;
+        }
 
-    .custom-checkbox .checkmark:after {
-      content: "";
-      position: absolute;
-      display: none;
-    }
+         .header-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: #4a90e2;
+            color: white;
+            padding: 8px 20px;
+            font-weight: 700;
+            font-size: 1.2em;
+            display: flex;
+            justify-content: space-between; /* site name left, credits right */
+            align-items: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            z-index: 9999;
+        }
 
-    .custom-checkbox input:checked ~ .checkmark:after {
-      display: block;
-      left: 6px;
-      top: 2px;
-      width: 6px;
-      height: 12px;
-      border: solid white;
-      border-width: 0 3px 3px 0;
-      transform: rotate(45deg);
-    }
+        .site-name {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
 
-    #loading {
-      display: none;
-      font-size: 1rem;
-      color: #2d5be3;
-      margin-top: 20px;
-    }
+        .credits-icon {
+            cursor: default;
+            user-select: none;
+            font-weight: 600;
+        }
 
-    #progress-messages {
-      white-space: pre-wrap;
-      max-height: 300px;
-      overflow-y: auto;
-      font-size: 0.95rem;
-      margin-top: 10px;
-    }
+        .checkbox-group {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
 
-    details {
-      margin-top: 1rem;
-      padding: 1rem;
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-    }
-  </style>
+  /* Custom checkbox style */
+  .custom-checkbox {
+    position: relative;
+    padding-left: 28px;
+    cursor: pointer;
+    font-weight: 600;
+    user-select: none;
+    color: #222;
+    font-size: 1.1em;
+  }
+  .custom-checkbox input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+  }
+  .custom-checkbox .checkmark {
+    position: absolute;
+    top: 2px;
+    left: 0;
+    height: 20px;
+    width: 20px;
+    background-color: #eee;
+    border-radius: 6px;
+    transition: background-color 0.3s ease;
+  }
+  .custom-checkbox:hover .checkmark {
+    background-color: #d0e4ff;
+  }
+  .custom-checkbox input:checked ~ .checkmark {
+    background-color: #4a90e2;
+  }
+  .custom-checkbox .checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+  }
+  .custom-checkbox input:checked ~ .checkmark:after {
+    display: block;
+  }
+  .custom-checkbox .checkmark:after {
+    left: 7px;
+    top: 3px;
+    width: 5px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 3px 3px 0;
+    transform: rotate(45deg);
+        }
+
+
+    </style>
 </head>
 <body>
-  <div class="header-bar">
-    <div class="site-name">Summary Sound</div>
-    <div class="credits-icon">
-      Credits: <span id="credits-count">{{ credits if credits is not none else 0 }}</span>
+                <div class="header-bar">
+          <div class="site-name">Summary Sound</div>
+          <div class="credits-icon" title="Your remaining credits">
+            Credits: <span id="credits-count">{{ credits if credits is not none else 0 }}</span>
+          </div>
+        </div>
+
+
+    <div class="user-info">
+        <div class="icon">👤</div>
+        {% if username %}
+            <div>{{ username }} (Credits: {{ credits }})</div></div>
+        {% else %}
+            <div>Guest</div>
+        {% endif %}
     </div>
-  </div>
 
-  <div class="user-info">
-    <div class="icon">👤</div>
-    <div>
-      {% if username %}
-        {{ username }} (Credits: {{ credits }})
-      {% else %}
-        Guest
-      {% endif %}
-    </div>
-  </div>
+    <div class="container">
+        <h1>Audio to PDF Summary Generator</h1>
 
-  <div class="container">
-    <h1>Audio to PDF Summary Generator</h1>
-
-    <div class="auth-buttons">
-      {% if current_user.is_authenticated %}
+                <div class="auth-buttons">
+    {% if current_user.is_authenticated %}
         <a href="{{ url_for('buy_credits') }}">Buy Credits</a>
         <a href="{{ url_for('logout') }}" style="background-color: #dc3545;">Logout</a>
-      {% else %}
+    {% else %}
         <a href="{{ url_for('login') }}">Login</a>
-        <a href="{{ url_for('register') }}">Register</a>
+        <a href="{{ url_for('register') }}" class="register-btn">Register</a>
         <a href="{{ url_for('buy_credits') }}">Buy Credits</a>
-      {% endif %}
+    {% endif %}
+</div>
+
+        <form id="upload-form" method="POST" action="/upload" enctype="multipart/form-data">
+  <input type="file" name="audio_file" accept="audio/*" required>
+
+  <div class="checkbox-group" style="margin: 20px 0;">
+    <label class="custom-checkbox">
+      <input type="checkbox" name="outputs" value="transcript" checked>
+      <span class="checkmark"></span>
+      Transcript
+    </label>
+    <label class="custom-checkbox">
+      <input type="checkbox" name="outputs" value="summary" checked>
+      <span class="checkmark"></span>
+      Summary
+    </label>
+    <label class="custom-checkbox">
+      <input type="checkbox" name="outputs" value="maths" checked>
+      <span class="checkmark"></span>
+      Maths Transcript
+    </label>
+  </div>
+
+  <p id="cost-estimate" style="font-size: 0.95em; color: #444; margin-bottom: 16px;"></p>
+
+  <button type="submit">Generate PDF</button>
+</form>
+        <div id="loading" style="margin-top: 20px; font-weight: bold; font-size: 0.8em; color: #e2544a; display: none;">
+    <div id="progress-messages">Generating PDF, please wait...</div>
+</div>
+
     </div>
+    <!-- FAQ Section -->
+<div style="max-width: 600px; width: 90%; margin: 3em auto;">
+    <h2 style="text-align: center; color: #222;">Frequently Asked Questions</h2>
 
-    <form id="upload-form" method="POST" action="/upload" enctype="multipart/form-data">
-      <input type="file" name="audio_file" accept="audio/*" required />
+    <details style="margin-top: 1em; padding: 1em; background: #fff; border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.1);">
+        <summary><strong>What are credits used for?</strong></summary>
+        <p>Credits are used to transcribe and summarize audio. 1 minute = 1 credit.</p>
+    </details>
 
-      <div class="checkbox-group">
-        <label class="custom-checkbox">
-          <input type="checkbox" name="outputs" value="transcript" checked />
-          <span class="checkmark"></span>
-          Transcript
-        </label>
-        <label class="custom-checkbox">
-          <input type="checkbox" name="outputs" value="summary" checked />
-          <span class="checkmark"></span>
-          Summary
-        </label>
-        <label class="custom-checkbox">
-          <input type="checkbox" name="outputs" value="maths" checked />
-          <span class="checkmark"></span>
-          Maths Transcript
-        </label>
-      </div>
+    <details style="margin-top: 1em; padding: 1em; background: #fff; border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.1);">
+        <summary><strong>How many credits do I need?</strong></summary>
+        <p>It depends on the audio length. A 10-minute file needs 10 credits.</p>
+    </details>
 
-      <p id="cost-estimate"></p>
-      <button type="submit">Generate PDF</button>
-    </form>
+    <details style="margin-top: 1em; padding: 1em; background: #fff; border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.1);">
+        <summary><strong>Do credits expire?</strong></summary>
+        <p>No, your purchased credits never expire.</p>
+    </details>
 
-    <div id="loading">
-      <div id="progress-messages">Generating PDF, please wait...</div>
+    <details style="margin-top: 1em; padding: 1em; background: #fff; border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.1);">
+        <summary><strong>How is audio transcribed and summarised?</strong></summary>
+        <p>Audio is transcribed using Open AIs whisper model, and then formatted and summarised using ChatGPT 3.5 Turbo.</p>
+    </details>
+
+    <div style="max-width: 400px; width: 90%; margin: 3em auto; background: #fff; padding: 20px; border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); text-align: center;">
+    <h2 style="color: #222; margin-bottom: 16px;">
+        📬 Contact Me
+    </h2>
+    <p style="font-size: 1.1em; color: #444;">
+        You can reach me at <a href="mailto:youremail@example.com" style="color: #4a90e2; text-decoration: none;">josh04physics@gmail.com</a>
+    </p>
     </div>
-  </div>
+</div>
 
-  <div style="max-width: 600px; margin: 3em auto; padding: 0 1em;">
-    <h2 style="text-align: center; color: #333;">Frequently Asked Questions</h2>
+   <script>
+            const form = document.getElementById('upload-form');
+const fileInput = document.querySelector('input[name="audio_file"]');
+const costEstimate = document.getElementById('cost-estimate');
+const loadingDiv = document.getElementById('loading');
+const progressDiv = document.getElementById('progress-messages');
 
-    <details>
-      <summary><strong>What are credits used for?</strong></summary>
-      <p>Credits are used to transcribe and summarize audio. 1 minute = 1 credit.</p>
-    </details>
+const outputCheckboxes = document.querySelectorAll('input[name="outputs"]');
 
-    <details>
-      <summary><strong>How many credits do I need?</strong></summary>
-      <p>It depends on the audio length. A 10-minute file needs 10 credits.</p>
-    </details>
-
-    <details>
-      <summary><strong>Do credits expire?</strong></summary>
-      <p>No, your purchased credits never expire.</p>
-    </details>
-
-    <details>
-      <summary><strong>How is audio transcribed and summarised?</strong></summary>
-      <p>Audio is transcribed using OpenAI's Whisper model, then formatted and summarised with GPT-3.5 Turbo.</p>
-    </details>
-  </div>
-
-  <div style="text-align: center; padding: 2em;">
-    <h3>📬 Contact Me</h3>
-    <p>Email: <a href="mailto:josh04physics@gmail.com">josh04physics@gmail.com</a></p>
-  </div>
-
-  <script>
-    const form = document.getElementById('upload-form');
-    const fileInput = document.querySelector('input[name="audio_file"]');
-    const costEstimate = document.getElementById('cost-estimate');
-    const loadingDiv = document.getElementById('loading');
-    const progressDiv = document.getElementById('progress-messages');
-    const outputCheckboxes = document.querySelectorAll('input[name="outputs"]');
-
-    function updateCostEstimate() {
-      const file = fileInput.files[0];
-      if (!file) {
+function updateCostEstimate() {
+    const file = fileInput.files[0];
+    if (!file) {
         costEstimate.textContent = '';
         return;
-      }
-      const sizeInMB = file.size / (1024 * 1024);
-      const estimatedMinutes = Math.max(1, Math.ceil(sizeInMB));
-      const selectedOutputs = [...outputCheckboxes].filter(cb => cb.checked);
-      const totalCredits = estimatedMinutes * selectedOutputs.length;
-
-      costEstimate.textContent = `Estimated credit cost: ${totalCredits} credit${totalCredits !== 1 ? 's' : ''} (${estimatedMinutes} minute${estimatedMinutes !== 1 ? 's' : ''} × ${selectedOutputs.length} output${selectedOutputs.length !== 1 ? 's' : ''})`;
     }
+    const sizeInMB = file.size / (1024 * 1024);
+    const estimatedMinutes = Math.max(1, Math.ceil(sizeInMB)); // round up
 
-    fileInput.addEventListener('change', updateCostEstimate);
-    outputCheckboxes.forEach(cb => cb.addEventListener('change', updateCostEstimate));
+    const selectedOutputs = [...outputCheckboxes].filter(cb => cb.checked);
+    const outputCount = selectedOutputs.length;
 
-    form.addEventListener('submit', () => {
-      loadingDiv.style.display = 'block';
-      progressDiv.innerText = "Uploading file...";
-      const eventSource = new EventSource('/progress');
-      eventSource.onmessage = function(event) {
+    const totalCredits = estimatedMinutes * outputCount;
+
+    costEstimate.textContent = `Estimated credit cost: ${totalCredits} credit${totalCredits !== 1 ? 's' : ''} (${estimatedMinutes} minute${estimatedMinutes !== 1 ? 's' : ''} × ${outputCount} output${outputCount !== 1 ? 's' : ''})`;
+}
+
+// Update cost estimate when file or outputs change
+fileInput.addEventListener('change', updateCostEstimate);
+outputCheckboxes.forEach(cb => cb.addEventListener('change', updateCostEstimate));
+
+form.addEventListener('submit', () => {
+    loadingDiv.style.display = 'block';
+    progressDiv.innerText = "Uploading file...";
+
+    const eventSource = new EventSource('/progress');
+    eventSource.onmessage = function(event) {
         if (event.data === "[DONE]") {
-          eventSource.close();
-          progressDiv.innerText += "\n✅ Done! Preparing your download...";
+            eventSource.close();
+            progressDiv.innerText += "\n✅ Done! Preparing your download...";
         } else {
-          progressDiv.innerText += "\n" + event.data;
+            progressDiv.innerText += "\n" + event.data;
         }
         progressDiv.scrollTop = progressDiv.scrollHeight;
-      };
-    });
-  </script>
+    };
+});
+
+</script>
 </body>
 </html>

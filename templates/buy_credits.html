@@ -92,6 +92,21 @@
             background-color: #d1ecf1;
             color: #0c5460;
         }
+         .bundle-buttons button {
+        margin: 0.3em;
+        padding: 0.6em 1em;
+        background-color: #2196F3;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.95em;
+        cursor: pointer;
+    }
+
+    .bundle-buttons button:hover {
+        background-color: #1976D2;
+    }
+
     </style>
 </head>
 <body>
@@ -112,10 +127,45 @@
         <h2>Buy Credits</h2>
 
         <form method="POST">
-            <label for="credits">Credits to purchase (min 20):</label>
-            <input type="number" id="credits" name="credits" min="20" required>
-            <button type="submit">Buy Credits</button>
+    <label for="credits">Credits to purchase (min 250):</label>
+    <input type="number" id="credits" name="credits" min="250" required>
+             <button type="submit">Buy Credits</button>
         </form>
+
+
+
+    <div class="bundle-buttons" style="margin: 1em 0;">
+        <strong>Or pick a bundle:</strong><br><br>
+        <button type="button" onclick="purchaseBundle(300)">300 credits (£5.40) [1.8p / credit]</button>
+        <button type="button" onclick="purchaseBundle(500)">500 credits (£8.50) [1.7p / credit]</button>
+        <button type="button" onclick="purchaseBundle(1000)">1000 credits (£16.00) [1.5p / credit]</button>
+        <button type="button" onclick="purchaseBundle(2000)">2000 credits (£25.00) [1.25p / credit] </button>
+    </div>
+
+
+
+<script>
+    function setCredits(amount) {
+        document.getElementById('credits').value = amount;
+    }
+    async function purchaseBundle(credits) {
+    const response = await fetch("/create-checkout-session", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ credits })
+    });
+
+    const data = await response.json();
+    if (data.url) {
+        window.location.href = data.url;  // Redirect to Stripe
+    } else {
+        alert("Something went wrong. Please try again.");
+    }
+}
+</script>
+
 
         {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
@@ -131,33 +181,6 @@
 {% endwith %}
     </div>
 
- <h3 style="margin-top: 2em;">Credit Cost Breakdown</h3>
-<table style="width: 100%; border-collapse: collapse; margin-top: 1em;">
-  <thead>
-    <tr style="background-color: #f2f2f2;">
-      <th style="padding: 0.75em; border: 1px solid #ccc; text-align: left;">Credits</th>
-      <th style="padding: 0.75em; border: 1px solid #ccc; text-align: left;">Price (USD)</th>
-      <th style="padding: 0.75em; border: 1px solid #ccc; text-align: left;">What you can do</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td style="padding: 0.75em; border: 1px solid #ccc;">20 credits</td>
-      <td style="padding: 0.75em; border: 1px solid #ccc;">$0.40</td>
-      <td style="padding: 0.75em; border: 1px solid #ccc;">Transcribe and summarise ~20 minutes of audio</td>
-    </tr>
-    <tr>
-      <td style="padding: 0.75em; border: 1px solid #ccc;">50 credits</td>
-      <td style="padding: 0.75em; border: 1px solid #ccc;">$1.00</td>
-      <td style="padding: 0.75em; border: 1px solid #ccc;">Transcribe and summarise ~50 minutes of audio</td>
-    </tr>
-    <tr>
-      <td style="padding: 0.75em; border: 1px solid #ccc;">100 credits</td>
-      <td style="padding: 0.75em; border: 1px solid #ccc;">$2.00</td>
-      <td style="padding: 0.75em; border: 1px solid #ccc;">Transcribe and summarise ~1 hour and 40 minutes of audio</td>
-    </tr>
-  </tbody>
-</table>
 
 </body>
 </html>

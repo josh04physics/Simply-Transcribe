@@ -115,8 +115,8 @@ def progress():
 
 @app.route('/buy-credits', methods=['GET', 'POST'])
 @login_required
-def buy_credits():
-    MIN_CREDITS = 20  # Minimum credits required to purchase
+def buy_credits(): # For specifying amount (confusing name, change later??)
+    MIN_CREDITS = 250  # Minimum credits required to purchase
 
     if request.method == 'POST':
         try:
@@ -147,12 +147,54 @@ def buy_credits():
             success_url=YOUR_DOMAIN + url_for('payment_success', _external=False) + '?session_id={CHECKOUT_SESSION_ID}',
             cancel_url=YOUR_DOMAIN + url_for('buy_credits', _external=False),
             client_reference_id=current_user.id,
+            metadata={
+                "user_id": str(current_user.id),
+                "credits": str(credits_to_buy)
+            }
         )
 
         return redirect(session.url, code=303)
 
     return render_template('buy_credits.html')
+@app.route("/create-checkout-session", methods=["POST"])
+@login_required
+def create_checkout_session(): # For bundle (confusing names, change later?)
+    credit_amount = int(request.json["credits"])
 
+    # Define pricing (pence, i.e. 1600 = £16.00)
+    prices = {
+        300: 540,
+        500: 850,
+        1000: 1600,
+        2000: 2500
+    }
+
+    price = prices.get(credit_amount)
+    if not price:
+        return jsonify({"error": "Invalid bundle"}), 400
+
+    session = stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        line_items=[{
+            "price_data": {
+                "currency": "gbp",
+                "product_data": {
+                    "name": f"{credit_amount} Credit Bundle",
+                },
+                "unit_amount": price,
+            },
+            "quantity": 1,
+        }],
+        mode="payment",
+        success_url=url_for("payment_success", _external=True) + "?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url=url_for("buy_credits", _external=True),
+        metadata={
+            "user_id": str(current_user.id),  # IDs must be string
+            "credits": str(credit_amount)
+        }
+    )
+
+    return jsonify({"url": session.url})
 
 @app.route('/payment-success')
 @login_required
@@ -163,30 +205,24 @@ def payment_success():
         return redirect(url_for('buy_credits'))
 
     session = stripe.checkout.Session.retrieve(session_id)
+
     if session.payment_status != 'paid':
         flash('Payment was not successful.', 'danger')
         return redirect(url_for('buy_credits'))
 
-    # Check if credits already added to avoid double credits on refresh
     if getattr(current_user, 'credits_purchased', None) != session.id:
-        # Add credits to user (based on line_items quantity)
-        # Stripe does not return line_items by default, fetch them:
-        line_items = stripe.checkout.Session.list_line_items(session_id)
-        total_credits = 0
-        for item in line_items.data:
-            total_credits += item.quantity
+        # Get credits from metadata (as string, so convert)
+        credits = int(session.metadata.get("credits", 0))
 
-        current_user.credits += total_credits
-        # Store session id on user to prevent double adding (optional)
+        current_user.credits += credits
         current_user.credits_purchased = session.id
         db.session.commit()
 
-        flash(f'Successfully added {total_credits} credits to your account!', 'success')
-
+        flash(f'Successfully added {credits} credits to your account!', 'success')
     else:
         flash('Credits already added for this purchase.', 'info')
 
-    return redirect(url_for('index'))
+    return redirect(url_for('buy_credits'))
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
