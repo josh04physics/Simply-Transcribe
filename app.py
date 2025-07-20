@@ -285,7 +285,7 @@ def upload_file():
     with zipfile.ZipFile(memory_file, 'w') as zf:
         zf.write(transcript_path, arcname='transcript.pdf')
         zf.write(summary_path, arcname='summary.pdf')
-        zf.write(math_transcript_path, arcname="math-transcript")
+        zf.write(math_transcript_path, arcname="math-transcript.pdf")
     memory_file.seek(0)
 
     return send_file(memory_file, as_attachment=True, download_name='audio_outputs.zip')
