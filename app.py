@@ -19,8 +19,7 @@ from dotenv import load_dotenv
 import stripe
 
 
-load_dotenv("stripedata.env")
-#load_dotenv("database.env")
+load_dotenv()
 
 
 app = Flask(__name__)
@@ -31,16 +30,21 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY") # get stripe data (different loc
 YOUR_DOMAIN = os.getenv("YOUR_DOMAIN")  # e.g. https://yourdomai
 
 
-# 1. Set DATABASE_URL from environment or default to local instance folder RIGHT NOW IT DEFAULTS - FIX THIS
-database_url = os.environ.get("DATABASE_URL")
+# 1. Set DATABASE_URL from environment or default to local instance folder RIGHT NOW IT DEFAULTS - FIX THIS or does it??? TEMP STOP TO GET BUILD WORKING
+#database_url = os.environ.get("DATABASE_URL")
 
+
+database_url = None
 if not database_url:
     os.makedirs(app.instance_path, exist_ok=True)
     db_path = os.path.join(app.instance_path, 'users.db')
     database_url = f"sqlite:///{db_path}"
 else:
+
     # Extract file path from DATABASE_URL
     db_path = database_url.replace("sqlite:///", "")
+
+
 
 # 2. Configure SQLAlchemy
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
@@ -283,7 +287,7 @@ def upload_file():
     with zipfile.ZipFile(memory_file, 'w') as zf:
         zf.write(transcript_path, arcname='transcript.pdf')
         zf.write(summary_path, arcname='summary.pdf')
-        zf.write(math_transcript_path, arcname="math-transcript.pdf")
+        zf.write(math_transcript_path, arcname="math-transcript")
     memory_file.seek(0)
 
     return send_file(memory_file, as_attachment=True, download_name='audio_outputs.zip')
@@ -291,4 +295,4 @@ def upload_file():
 
 if __name__ == '__main__':
     print(db)
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0')

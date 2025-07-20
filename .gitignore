@@ -1,7 +1,5 @@
 venv/
 .idea/
 __pycache__/
-APIkey.env
-database.env
-stripedata.env
+.env
 instance/
