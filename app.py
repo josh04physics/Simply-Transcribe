@@ -22,7 +22,7 @@ import stripe
 load_dotenv()
 
 
-app = Flask(__name__)
+app = Flask(__name__, instance_relative_config=True)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['SECRET_KEY'] = 'your_secret_key'
 
@@ -30,34 +30,32 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY") # get stripe data (different loc
 YOUR_DOMAIN = os.getenv("YOUR_DOMAIN")  # e.g. https://yourdomai
 
 
-# 1. Set DATABASE_URL from environment or default to local instance folder RIGHT NOW IT DEFAULTS - FIX THIS or does it??? TEMP STOP TO GET BUILD WORKING
-#database_url = os.environ.get("DATABASE_URL")
+# work on setting database
+# Database config: use DATABASE_URL from .env or Render
+database_url = os.environ.get("DATABASE_URL")
 
-
-database_url = None
 if not database_url:
     os.makedirs(app.instance_path, exist_ok=True)
     db_path = os.path.join(app.instance_path, 'users.db')
     database_url = f"sqlite:///{db_path}"
-else:
 
-    # Extract file path from DATABASE_URL
+# If using SQLite, ensure absolute path (fixes Render + Docker issues)
+if database_url.startswith("sqlite:///"):
     db_path = database_url.replace("sqlite:///", "")
+    db_path = os.path.abspath(db_path)
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    database_url = f"sqlite:///{db_path}"
 
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+# Init DB
+db.init_app(app)
 
-# 2. Configure SQLAlchemy
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db.init_app(app) # order matters of this, must be called after config but before creation.
-
-# 3. Create DB if it doesn't exist
-if not os.path.exists(db_path):
-    with app.app_context():
+# Create DB tables if they don't exist (mainly for SQLite/local)
+with app.app_context():
+    if database_url.startswith("sqlite:///") and not os.path.exists(db_path):
         db.create_all()
-        print("✅ Created new database at", db_path)
-
 
 
 
