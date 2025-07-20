@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Audio to PDF Summary Generator</title>
+    <title>Summary Sound</title>
     <style>
         /* Base Styles */
         * {
@@ -28,6 +28,7 @@
             justify-content: flex-start;
             min-height: 100vh;
             color: #333;
+            padding-top: 48px; /* Prevent content hiding behind fixed header */
         }
 
         /* User Icon and Username container */
@@ -83,8 +84,8 @@
         }
 
         .auth-buttons a.register-btn {
-            background-color: #28a745; /* green */
-        }
+            background-color: #4a90e2; /* same blue as login */
+            }
 
         .auth-buttons a:hover {
             filter: brightness(0.85);
@@ -105,8 +106,8 @@
             border-color: #777;
         }
 
-        button {
-            background-color: #4a90e2;
+                button {
+            background-color: #28a745;
             color: white;
             padding: 12px 20px;
             font-size: 1em;
@@ -117,7 +118,7 @@
         }
 
         button:hover {
-            background-color: #357ab8;
+            background-color: #218838;
         }
 
         #loading {
@@ -127,9 +128,47 @@
             color: #4a90e2;
             display: none;
         }
+
+         .header-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: #4a90e2;
+            color: white;
+            padding: 8px 20px;
+            font-weight: 700;
+            font-size: 1.2em;
+            display: flex;
+            justify-content: space-between; /* site name left, credits right */
+            align-items: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            z-index: 9999;
+        }
+
+        .site-name {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
+
+        .credits-icon {
+            cursor: default;
+            user-select: none;
+            font-weight: 600;
+        }
+
+
     </style>
 </head>
 <body>
+                <div class="header-bar">
+          <div class="site-name">Summary Sound</div>
+          <div class="credits-icon" title="Your remaining credits">
+            Credits: <span id="credits-count">{{ credits if credits is not none else 0 }}</span>
+          </div>
+        </div>
+
+
     <div class="user-info">
         <div class="icon">👤</div>
         {% if username %}
@@ -188,6 +227,15 @@
         <summary><strong>How is audio transcribed and summarised?</strong></summary>
         <p>Audio is transcribed using Open AIs whisper model, and then formatted and summarised using ChatGPT 3.5 Turbo.</p>
     </details>
+
+    <div style="max-width: 400px; width: 90%; margin: 3em auto; background: #fff; padding: 20px; border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); text-align: center;">
+    <h2 style="color: #222; margin-bottom: 16px;">
+        📬 Contact Me
+    </h2>
+    <p style="font-size: 1.1em; color: #444;">
+        You can reach me at <a href="mailto:youremail@example.com" style="color: #4a90e2; text-decoration: none;">josh04physics@gmail.com</a>
+    </p>
+    </div>
 </div>
 
    <script>
