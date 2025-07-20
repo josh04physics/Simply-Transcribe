@@ -157,6 +157,64 @@
             font-weight: 600;
         }
 
+        .checkbox-group {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* Custom checkbox style */
+  .custom-checkbox {
+    position: relative;
+    padding-left: 28px;
+    cursor: pointer;
+    font-weight: 600;
+    user-select: none;
+    color: #222;
+    font-size: 1.1em;
+  }
+  .custom-checkbox input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+  }
+  .custom-checkbox .checkmark {
+    position: absolute;
+    top: 2px;
+    left: 0;
+    height: 20px;
+    width: 20px;
+    background-color: #eee;
+    border-radius: 6px;
+    transition: background-color 0.3s ease;
+  }
+  .custom-checkbox:hover .checkmark {
+    background-color: #d0e4ff;
+  }
+  .custom-checkbox input:checked ~ .checkmark {
+    background-color: #4a90e2;
+  }
+  .custom-checkbox .checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+  }
+  .custom-checkbox input:checked ~ .checkmark:after {
+    display: block;
+  }
+  .custom-checkbox .checkmark:after {
+    left: 7px;
+    top: 3px;
+    width: 5px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 3px 3px 0;
+    transform: rotate(45deg);
+        }
+
 
     </style>
 </head>
@@ -193,12 +251,30 @@
 </div>
 
         <form id="upload-form" method="POST" action="/upload" enctype="multipart/form-data">
-            <input type="file" name="audio_file" accept="audio/*" required>
-            <br>
-            <button type="submit">Generate PDF</button>
-            <p id="cost-estimate" style="margin-top: 10px; font-size: 0.95em; color: #444;"></p>
-        </form>
+  <input type="file" name="audio_file" accept="audio/*" required>
 
+  <div class="checkbox-group" style="margin: 20px 0;">
+    <label class="custom-checkbox">
+      <input type="checkbox" name="outputs" value="transcript" checked>
+      <span class="checkmark"></span>
+      Transcript
+    </label>
+    <label class="custom-checkbox">
+      <input type="checkbox" name="outputs" value="summary" checked>
+      <span class="checkmark"></span>
+      Summary
+    </label>
+    <label class="custom-checkbox">
+      <input type="checkbox" name="outputs" value="maths" checked>
+      <span class="checkmark"></span>
+      Maths Transcript
+    </label>
+  </div>
+
+  <p id="cost-estimate" style="font-size: 0.95em; color: #444; margin-bottom: 16px;"></p>
+
+  <button type="submit">Generate PDF</button>
+</form>
         <div id="loading" style="margin-top: 20px; font-weight: bold; font-size: 0.8em; color: #e2544a; display: none;">
     <div id="progress-messages">Generating PDF, please wait...</div>
 </div>
@@ -240,39 +316,50 @@
 
    <script>
             const form = document.getElementById('upload-form');
-            const fileInput = document.querySelector('input[name="audio_file"]');
-            const costEstimate = document.getElementById('cost-estimate');
-            const loadingDiv = document.getElementById('loading');
-            const progressDiv = document.getElementById('progress-messages');
+const fileInput = document.querySelector('input[name="audio_file"]');
+const costEstimate = document.getElementById('cost-estimate');
+const loadingDiv = document.getElementById('loading');
+const progressDiv = document.getElementById('progress-messages');
 
-            // Estimate duration using file size (approximation)
-            // Assumes 1MB ≈ 1 minute for compressed formats like MP3 (128kbps)
-            fileInput.addEventListener('change', () => {
-                const file = fileInput.files[0];
-                if (file) {
-                    const sizeInMB = file.size / (1024 * 1024);
-                    const estimatedMinutes = Math.max(1, Math.ceil(sizeInMB)); // round up
-                    costEstimate.textContent = `Estimated credit cost: ${estimatedMinutes} credit${estimatedMinutes > 1 ? 's' : ''}`;
-                } else {
-                    costEstimate.textContent = '';
-                }
-            });
+const outputCheckboxes = document.querySelectorAll('input[name="outputs"]');
 
-            form.addEventListener('submit', () => {
-                loadingDiv.style.display = 'block';
-                progressDiv.innerText = "Uploading file...";
+function updateCostEstimate() {
+    const file = fileInput.files[0];
+    if (!file) {
+        costEstimate.textContent = '';
+        return;
+    }
+    const sizeInMB = file.size / (1024 * 1024);
+    const estimatedMinutes = Math.max(1, Math.ceil(sizeInMB)); // round up
 
-                const eventSource = new EventSource('/progress');
-                eventSource.onmessage = function(event) {
-                    if (event.data === "[DONE]") {
-                        eventSource.close();
-                        progressDiv.innerText += "\n✅ Done! Preparing your download...";
-                    } else {
-                        progressDiv.innerText += "\n" + event.data;
-                    }
-                    progressDiv.scrollTop = progressDiv.scrollHeight;
-                };
-            });
+    const selectedOutputs = [...outputCheckboxes].filter(cb => cb.checked);
+    const outputCount = selectedOutputs.length;
+
+    const totalCredits = estimatedMinutes * outputCount;
+
+    costEstimate.textContent = `Estimated credit cost: ${totalCredits} credit${totalCredits !== 1 ? 's' : ''} (${estimatedMinutes} minute${estimatedMinutes !== 1 ? 's' : ''} × ${outputCount} output${outputCount !== 1 ? 's' : ''})`;
+}
+
+// Update cost estimate when file or outputs change
+fileInput.addEventListener('change', updateCostEstimate);
+outputCheckboxes.forEach(cb => cb.addEventListener('change', updateCostEstimate));
+
+form.addEventListener('submit', () => {
+    loadingDiv.style.display = 'block';
+    progressDiv.innerText = "Uploading file...";
+
+    const eventSource = new EventSource('/progress');
+    eventSource.onmessage = function(event) {
+        if (event.data === "[DONE]") {
+            eventSource.close();
+            progressDiv.innerText += "\n✅ Done! Preparing your download...";
+        } else {
+            progressDiv.innerText += "\n" + event.data;
+        }
+        progressDiv.scrollTop = progressDiv.scrollHeight;
+    };
+});
+
 </script>
 </body>
 </html>

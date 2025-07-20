@@ -245,6 +245,12 @@ def upload_file():
         flash("No selected file", "danger")
         return redirect(url_for('index'))
 
+    # Get selected outputs from form checkboxes (list of strings)
+    outputs = request.form.getlist('outputs')
+    if not outputs:
+        flash("Please select at least one output type.", "warning")
+        return redirect(url_for('index'))
+
     audio_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
     file.save(audio_path)
 
@@ -265,31 +271,39 @@ def upload_file():
     current_user.credits -= duration_minutes
     db.session.commit()
 
-    # --- STEP 4: Proceed with transcription ---
-    pdf_filename = os.path.splitext(file.filename)[0] + '.pdf'
-    transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{pdf_filename}-transcript") # countintuitive labelling - fix
-    summary_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{pdf_filename}-summary")
-    math_transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{pdf_filename}-math_transcript")
-
-
+    # --- STEP 4: Transcribe audio ---
     transcript = transcribe_audio(audio_path, progress_callback)
 
+    # Prepare base filename (without extension)
+    base_filename = os.path.splitext(file.filename)[0]
 
-    generate_math_pdf_from_transcipt(transcript,math_transcript_path, progress_callback)
-    generate_formatted_transcript_from_base_transcript(transcript, transcript_path, progress_callback) # counterintuitive labelling - fix
-    generate_summary_from_base_transcript(transcript, summary_path, progress_callback)
+    output_files = []
+
+    if 'maths' in outputs:
+        math_transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{base_filename}-math_transcript.pdf")
+        generate_math_pdf_from_transcipt(transcript, math_transcript_path, progress_callback)
+        output_files.append((math_transcript_path, "math-transcript.pdf"))
+
+    if 'transcript' in outputs:
+        transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{base_filename}-transcript.pdf")
+        generate_formatted_transcript_from_base_transcript(transcript, transcript_path, progress_callback)
+        output_files.append((transcript_path, "transcript.pdf"))
+
+    if 'summary' in outputs:
+        summary_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{base_filename}-summary.pdf")
+        generate_summary_from_base_transcript(transcript, summary_path, progress_callback)
+        output_files.append((summary_path, "summary.pdf"))
+
     progress_callback("[DONE]")
 
-    # Create ZIP for download
+    # Create ZIP in-memory with only selected outputs
     memory_file = io.BytesIO()
     with zipfile.ZipFile(memory_file, 'w') as zf:
-        zf.write(transcript_path, arcname='transcript.pdf')
-        zf.write(summary_path, arcname='summary.pdf')
-        zf.write(math_transcript_path, arcname="math-transcript.pdf")
+        for filepath, arcname in output_files:
+            zf.write(filepath, arcname=arcname)
     memory_file.seek(0)
 
     return send_file(memory_file, as_attachment=True, download_name='audio_outputs.zip')
-
 
 if __name__ == '__main__':
     print(db)
