@@ -1,8 +1,9 @@
 # Base Python image
 FROM python:3.11-slim
 
-# Install system dependencies needed for TeXLive and font support
+# Install system dependencies including ffmpeg (which includes ffprobe), TeXLive and font support
 RUN apt-get update && apt-get install -y \
+    ffmpeg \
     texlive-latex-base \
     texlive-fonts-recommended \
     texlive-latex-extra \
@@ -16,8 +17,8 @@ WORKDIR /app
 # Copy all project files (including ./bin/ffmpeg)
 COPY . /app
 
-# Make ffmpeg executable and move it to a global path
-RUN chmod +x ./bin/ffmpeg && mv ./bin/ffmpeg /usr/local/bin/ffmpeg
+# Make local ffmpeg executable and move to global path if you still want to override system ffmpeg
+RUN chmod +x ./bin/ffmpeg && mv ./bin/ffmpeg /usr/local/bin/ffmpeg || echo "No local ffmpeg binary to move"
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
