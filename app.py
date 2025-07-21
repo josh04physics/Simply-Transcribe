@@ -316,9 +316,12 @@ def upload_file():
     output_files = []
 
     if 'maths' in outputs:
-        math_transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{base_filename}-math_transcript.pdf")
-        generate_math_pdf_from_transcipt(transcript, math_transcript_path, progress_callback)
-        output_files.append((math_transcript_path, "math-transcript.pdf"))
+        math_pdf_transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{base_filename}-math_transcript.pdf")
+        generate_math_pdf_from_transcipt(transcript, math_pdf_transcript_path, progress_callback)
+        output_files.append((math_pdf_transcript_path, "math-transcript.pdf"))
+
+        math_tex_transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"Math_Transcription.tex")
+        output_files.append((math_tex_transcript_path, "math-transcript.tex")) # TEMPORARY (maybe add functionallity to pdfgeneration) upload TEX file as well
 
     if 'transcript' in outputs:
         transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{base_filename}-transcript.pdf")
