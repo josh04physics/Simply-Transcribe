@@ -6,7 +6,8 @@
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f4f8;
+            background-color: #fff;
+            color: #000;
             padding: 2em;
             display: flex;
             justify-content: center;
@@ -15,17 +16,17 @@
         }
 
         .container {
-            background-color: white;
+            background-color: #fff;
             padding: 2em 3em;
             border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border: 1px solid #ddd;
             max-width: 400px;
             width: 100%;
         }
 
         h2 {
             text-align: center;
-            color: #333;
+            color: #000;
             margin-bottom: 1.5em;
         }
 
@@ -39,16 +40,18 @@
             width: 100%;
             padding: 0.6em;
             border-radius: 8px;
-            border: 1px solid #ccc;
+            border: 1px solid #000;
             font-size: 1em;
             margin-bottom: 1.2em;
+            background-color: #fff;
+            color: #000;
         }
 
         button {
             width: 100%;
             padding: 0.7em;
-            background-color: #4CAF50;
-            color: white;
+            background-color: #000;
+            color: #fff;
             border: none;
             border-radius: 8px;
             font-size: 1em;
@@ -57,7 +60,24 @@
         }
 
         button:hover {
-            background-color: #45a049;
+            background-color: #333;
+        }
+
+        .bundle-buttons button {
+            width: 100%;
+            margin: 0.4em 0;
+            padding: 0.6em 1em;
+            background-color: #000;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95em;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .bundle-buttons button:hover {
+            background-color: #333;
         }
 
         .flashes {
@@ -71,116 +91,87 @@
             margin-bottom: 0.5em;
             border-radius: 6px;
             font-size: 0.95em;
+            border: 1px solid #000;
+            background-color: #fff;
+            color: #000;
         }
 
-        .flash.success {
-            background-color: #d4edda;
-            color: #155724;
+        a.home-link {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            padding: 8px 14px;
+            background: transparent;
+            border: 1px solid #000;
+            color: #000;
+            text-decoration: none;
+            font-weight: bold;
+            border-radius: 6px;
+            transition: background-color 0.2s ease;
         }
 
-        .flash.warning {
-            background-color: #fff3cd;
-            color: #856404;
+        a.home-link:hover {
+            background-color: #000;
+            color: #fff;
         }
-
-        .flash.danger {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-
-        .flash.info {
-            background-color: #d1ecf1;
-            color: #0c5460;
-        }
-         .bundle-buttons button {
-        margin: 0.3em;
-        padding: 0.6em 1em;
-        background-color: #2196F3;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        font-size: 0.95em;
-        cursor: pointer;
-    }
-
-    .bundle-buttons button:hover {
-        background-color: #1976D2;
-    }
-
     </style>
 </head>
 <body>
-<a href="{{ url_for('index') }}" style="
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    padding: 8px 14px;
-    background: #4a90e2;
-    color: white;
-    text-decoration: none;
-    font-weight: bold;
-    border-radius: 6px;">
-    🏠 Home
-</a>
 
-    <div class="container">
-        <h2>Buy Credits</h2>
+<a href="{{ url_for('index') }}" class="home-link">🏠 Home</a>
 
-        <form method="POST">
-    <label for="credits">Credits to purchase (min 250):</label>
-    <input type="number" id="credits" name="credits" min="250" required>
-             <button type="submit">Buy Credits</button>
-        </form>
+<div class="container">
+    <h2>Buy Credits</h2>
 
+    <form method="POST">
+        <label for="credits">Credits to purchase (min 250):</label>
+        <input type="number" id="credits" name="credits" min="250" required>
+        <button type="submit">Buy Credits</button>
+    </form>
 
-
-    <div class="bundle-buttons" style="margin: 1em 0;">
+    <div class="bundle-buttons" style="margin-top: 1.5em;">
         <strong>Or pick a bundle:</strong><br><br>
         <button type="button" onclick="purchaseBundle(300)">300 credits (£5.40) [1.8p / credit]</button>
         <button type="button" onclick="purchaseBundle(500)">500 credits (£8.50) [1.7p / credit]</button>
         <button type="button" onclick="purchaseBundle(1000)">1000 credits (£16.00) [1.5p / credit]</button>
-        <button type="button" onclick="purchaseBundle(2000)">2000 credits (£25.00) [1.25p / credit] </button>
+        <button type="button" onclick="purchaseBundle(2000)">2000 credits (£25.00) [1.25p / credit]</button>
     </div>
 
-
+    <ul class="flashes">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    {% if "logged out" not in message.lower() and "please log in" not in message.lower() %}
+                        <li class="flash">{{ message }}</li>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </ul>
+</div>
 
 <script>
     function setCredits(amount) {
         document.getElementById('credits').value = amount;
     }
+
     async function purchaseBundle(credits) {
-    const response = await fetch("/create-checkout-session", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ credits })
-    });
+        const response = await fetch("/create-checkout-session", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ credits })
+        });
 
-    const data = await response.json();
-    if (data.url) {
-        window.location.href = data.url;  // Redirect to Stripe
-    } else {
-        alert("Something went wrong. Please try again.");
+        const data = await response.json();
+        if (data.url) {
+            window.location.href = data.url;
+        } else {
+            alert("Something went wrong. Please try again.");
+        }
     }
-}
 </script>
-
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    <ul class="flashes">
-      {% for category, message in messages %}
-        {# Skip logout/login prompt messages #}
-        {% if "logged out" not in message.lower() and "please log in" not in message.lower() %}
-          <li class="flash {{ category }}">{{ message }}</li>
-        {% endif %}
-      {% endfor %}
-    </ul>
-  {% endif %}
-{% endwith %}
-    </div>
-
 
 </body>
 </html>
