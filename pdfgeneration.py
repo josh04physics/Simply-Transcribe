@@ -17,6 +17,28 @@ client = OpenAI()
 # Target size per chunk (bytes). 24MB leaves buffer under 25MB Whisper limit.
 CHUNK_TARGET_SIZE = 24 * 1024 * 1024
 
+
+def sanitize_for_fpdf(text):
+    # Replace em dash and smart quotes with simple equivalents
+    replacements = {
+        "—": "-",  # em dash
+        "–": "-",  # en dash
+        "“": '"',
+        "”": '"',
+        "‘": "'",
+        "’": "'",
+        "…": "...",
+        "•": "-",  # bullets
+        " ": " ",  # narrow no-break space
+        "−": "-",  # minus sign
+        " ": " ",  # non-breaking space
+    }
+    for k, v in replacements.items():
+        text = text.replace(k, v)
+
+    # Ensure it's compatible with FPDF (Latin-1)
+    return text.encode("latin-1", errors="replace").decode("latin-1")
+
 def split_audio_by_size(file_path, chunk_target_size=CHUNK_TARGET_SIZE):
     audio = AudioSegment.from_file(file_path)
     total_size = os.path.getsize(file_path)
@@ -29,9 +51,13 @@ def split_audio_by_size(file_path, chunk_target_size=CHUNK_TARGET_SIZE):
     chunks = []
     for i in range(0, duration_ms, chunk_length_ms):
         chunk = audio[i:i + chunk_length_ms]
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-        chunk.export(temp_file.name, format="mp3")
-        chunks.append(temp_file.name)
+
+        # Create a temp file name only, don't keep the file handle open
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+            chunk_path = tmp.name
+
+        chunk.export(chunk_path, format="mp3")  # now safely write to it
+        chunks.append(chunk_path)
 
     return chunks
 
@@ -63,13 +89,12 @@ def format_transcription(text, progress_callback=None):
         if progress_callback:
             progress_callback(f"Formatting chunk {i + 1} of {len(chunks)}...")
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo-16k",
+            model="o4-mini-2025-04-16",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that formats audio transcripts."},
                 {"role": "user", "content": f"Add punctuation and paragraphing to this transcript:\n{chunk}"}
             ],
-            temperature=0.5,
-            max_tokens=4000
+            max_completion_tokens=40000
         )
         formatted_chunks.append(response.choices[0].message.content.strip())
 
@@ -78,46 +103,83 @@ def format_transcription(text, progress_callback=None):
 
     return "\n\n".join(formatted_chunks)
 
-def summarise_text_from_transcipt(text, progress_callback=None):
-    chunks = chunk_text_by_tokens(text)
+def summarise_text_from_transcript(text, progress_callback=None):
+    def safe_request(prompt, context_name="summary"):
+        try:
+            response = client.chat.completions.create(
+                model="o4-mini-2025-04-16",
+                messages=prompt,
+                max_completion_tokens=20000
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            if progress_callback:
+                progress_callback(f"[ERROR] {context_name} request failed: {str(e)}")
+            return None
+
+    # Use smaller chunk size to prevent overflow
+    chunks = chunk_text_by_tokens(text, max_tokens=20000)
     partial_summaries = []
 
+    # One-shot summary if small
+    if len(chunks) == 1:
+        if progress_callback:
+            progress_callback("Summarizing transcript...")
+        prompt = [
+            {"role": "system", "content": "You are a helpful assistant that summarizes transcripts."},
+            {"role": "user", "content": f"Please summarize the following transcript into a few paragraphs. The first line should be a title (no more than 9 words):\n\n{chunks[0]}"}
+        ]
+        summary = safe_request(prompt, "one-shot summary")
+        if not summary:
+            return "[ERROR] Summary failed."
+        if progress_callback:
+            progress_callback("Summary complete.")
+        return summary
+
+    # Chunked summarization
     for i, chunk in enumerate(chunks):
         if progress_callback:
             progress_callback(f"Summarizing chunk {i + 1} of {len(chunks)}...")
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo-16k",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant that summarizes transcripts."},
-                {"role": "user", "content": f"Summarize this part of a transcript into a paragraph:\n{chunk}"}
-            ],
-            temperature=0.5,
-            max_tokens=800
-        )
-        partial_summaries.append(response.choices[0].message.content.strip())
+        prompt = [
+            {"role": "system", "content": "You are a helpful assistant that summarizes transcripts."},
+            {"role": "user", "content": f"Summarize this part of a transcript into a paragraph:\n{chunk}"}
+        ]
+        summary = safe_request(prompt, f"chunk {i + 1}")
+        if summary:
+            partial_summaries.append(summary)
+        else:
+            partial_summaries.append(f"(Chunk {i+1} could not be summarized.)")
 
-    # Final summarization step
-    combined = "\n\n".join(partial_summaries)
+    # Final summary step
     if progress_callback:
         progress_callback("Generating final summary...")
 
-    final_response = client.chat.completions.create(
-        model="gpt-3.5-turbo-16k",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant that summarizes summaries."},
-            {"role": "user", "content": f"Combine and refine this summary into a few paragraphs. The first line should be a title of no more than 9 words.:\n{combined}"}
-        ],
-        temperature=0.5,
-        max_tokens=800
-    )
+    combined = "\n\n".join(partial_summaries)
+
+    # Trim if over safe token limit (leave room for output)
+    enc = tiktoken.get_encoding("cl100k_base")
+    combined_tokens = enc.encode(combined)
+    MAX_FINAL_INPUT_TOKENS = 15000
+
+    if len(combined_tokens) > MAX_FINAL_INPUT_TOKENS:
+        if progress_callback:
+            progress_callback("Truncating final input to stay within token limits.")
+        combined = enc.decode(combined_tokens[:MAX_FINAL_INPUT_TOKENS])
+
+    final_prompt = [
+        {"role": "system", "content": "You are a helpful assistant that summarizes summaries."},
+        {"role": "user", "content": f"Combine and refine the following summaries into a few concise paragraphs. The first line should be a title (no more than 9 words):\n\n{combined}"}
+    ]
+
+    final_summary = safe_request(final_prompt, "final summary")
 
     if progress_callback:
         progress_callback("Summary complete.")
 
-    return final_response.choices[0].message.content.strip()
+    return final_summary or "[ERROR] Final summary could not be generated."
 
-def chunk_text_by_tokens(text, model="gpt-3.5-turbo-16k", max_tokens=3500):
-    enc = tiktoken.encoding_for_model(model)
+def chunk_text_by_tokens(text, max_tokens=20000):
+    enc = tiktoken.get_encoding("cl100k_base")
     paragraphs = text.split("\n")
 
     chunks = []
@@ -126,7 +188,23 @@ def chunk_text_by_tokens(text, model="gpt-3.5-turbo-16k", max_tokens=3500):
 
     for para in paragraphs:
         token_count = len(enc.encode(para))
-        if current_tokens + token_count > max_tokens:
+        if token_count > max_tokens:
+            # Paragraph too large: split by sentence or truncate
+            sentences = para.split(". ")
+            temp_chunk = []
+            temp_tokens = 0
+            for sentence in sentences:
+                sentence_tokens = len(enc.encode(sentence))
+                if temp_tokens + sentence_tokens > max_tokens:
+                    chunks.append(". ".join(temp_chunk))
+                    temp_chunk = [sentence]
+                    temp_tokens = sentence_tokens
+                else:
+                    temp_chunk.append(sentence)
+                    temp_tokens += sentence_tokens
+            if temp_chunk:
+                chunks.append(". ".join(temp_chunk))
+        elif current_tokens + token_count > max_tokens:
             chunks.append("\n".join(current_chunk))
             current_chunk = [para]
             current_tokens = token_count
@@ -144,7 +222,7 @@ def generate_pdf_from_text(title, body_lines, output_path, progress_callback=Non
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, title, ln=True, align="C")
+    pdf.cell(0, 10, sanitize_for_fpdf(title), ln=True, align="C")
 
     pdf.set_font("Arial", size=12)
 
@@ -152,69 +230,99 @@ def generate_pdf_from_text(title, body_lines, output_path, progress_callback=Non
         progress_callback(f"Writing {len(body_lines)} lines to PDF...")
 
     for i, line in enumerate(body_lines):
-        pdf.multi_cell(0, 6, line)
+        clean_line = sanitize_for_fpdf(line)
+        pdf.multi_cell(0, 6, clean_line)
 
     pdf.output(output_path)
     if progress_callback:
         progress_callback(f"PDF generation complete: {output_path}")
 
 
-def generate_latex_from_transcript(
-    transcript_text,
-    output_dir="uploads",
-    tex_filename="transcript_body.tex",
-    progress_callback=None
-):
+def generate_latex_from_transcript(transcript_text, output_dir="uploads", tex_filename="transcript_body.tex", progress_callback=None):
+    import os
+
     os.makedirs(output_dir, exist_ok=True)
     tex_path = os.path.join(output_dir, tex_filename)
 
     if progress_callback:
-        progress_callback("Generating LaTeX body content from transcript...")
+        progress_callback("Chunking transcript for LaTeX generation...")
 
-    # Request only body content (no preamble)
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are an assistant that punctuates and converts transcript text into a full LaTeX document. "
-                    "The LaTeX document must include the documentclass declaration, necessary packages "
-                    "(such as amsmath and geometry), and begin/end document commands. "
-                    "Respond only with the full LaTeX code, and nothing else — no explanations or text before or after."
-                )
-            },
-            {
-                "role": "user",
-                "content": (
-                        "Convert the following transcript into a complete LaTeX document with punctuation with a preamble. "
-                        "Do not include any explanations — output only the raw LaTeX code:\n\n"
-                        + transcript_text
-                )
-            }
-        ],
-        temperature=0.3,
-        max_tokens=4000
+    chunks = chunk_text_by_tokens(transcript_text, max_tokens=20000)
+    latex_bodies = []
+
+    for i, chunk in enumerate(chunks):
+        if progress_callback:
+            progress_callback(f"Generating LaTeX for chunk {i+1} of {len(chunks)}...")
+
+        response = client.chat.completions.create(
+            model="o4-mini-2025-04-16",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that converts transcripts to LaTeX."},
+                {"role": "user", "content": f"Convert this into LaTeX body code with punctuation. Escape all special characters properly. Do NOT include document preamble or \\begin{{document}}:\n\n{chunk}"}
+            ],
+            max_completion_tokens=40000
+        )
+
+        body = response.choices[0].message.content.strip()
+        if body.startswith("```"):
+            body = "\n".join(body.splitlines()[1:-1])
+
+        if progress_callback:
+            progress_callback("Cleaning latex")
+        clean_body = clean_latex_unicode(body)
+        latex_bodies.append(clean_body)
+
+    final_tex = (
+        "\\documentclass{article}\n"
+        "\\usepackage[margin=1in]{geometry}\n"
+        "\\usepackage{amsmath, amssymb}\n"
+        "\\usepackage{enumitem}\n"
+        "\\usepackage{url}\n"
+        "\\begin{document}\n\n"
+        + "\n\n".join(latex_bodies)
+        + "\n\n\\end{document}"
     )
 
-
-    latex_raw = response.choices[0].message.content.strip()
-
-    # Remove Markdown-style code fences if present
-    if latex_raw.startswith("```") and latex_raw.endswith("```"):
-        latex_lines = latex_raw.splitlines()
-        # Strip the first and last lines (```latex and ```)
-        latex_clean = "\n".join(latex_lines[1:-1])
-    else:
-        latex_clean = latex_raw
-
     with open(tex_path, "w", encoding="utf-8") as f:
-        f.write(latex_clean)
+        f.write(final_tex)
 
     if progress_callback:
-        progress_callback(f"LaTeX body written to {tex_path}")
+        progress_callback(f"LaTeX file written: {tex_path}")
 
     return tex_path
+
+
+def clean_latex_unicode(text):
+    """
+    Replaces problematic Unicode characters in GPT output with LaTeX-safe equivalents.
+    Useful for sanitizing text before writing to a .tex file.
+    """
+    replacements = {
+        "−": "-",     # Unicode minus (U+2212) → ASCII hyphen
+        "–": "-",     # en dash (U+2013)
+        "—": "--",    # em dash (U+2014)
+        "“": "``",    # left double quote (U+201C)
+        "”": "''",    # right double quote (U+201D)
+        "‘": "`",     # left single quote (U+2018)
+        "’": "'",     # right single quote (U+2019)
+        "…": "...",   # ellipsis (U+2026)
+        "•": r"\textbullet{}",  # bullet point (U+2022)
+        "°": r"$^\circ$",       # degree symbol
+        "¼": r"\textonequarter{}",  # fraction
+        "½": r"\textonehalf{}",
+        "¾": r"\textthreequarters{}",
+        "©": r"\textcopyright{}",
+        "®": r"\textregistered{}",
+        "€": r"\euro{}",
+        "£": r"\pounds{}",
+        "\u00A0": " ",  # non-breaking space
+    }
+
+    for bad_char, replacement in replacements.items():
+        text = text.replace(bad_char, replacement)
+
+    return text
+
 
 def compile_latex_to_pdf(latex_file, pdf_path, progress_callback=None):
     """
@@ -264,15 +372,33 @@ def compile_latex_to_pdf(latex_file, pdf_path, progress_callback=None):
 
 
 def generate_summary_from_base_transcript(transcript, pdf_path, progress_callback=None):
-    summary = summarise_text_from_transcipt(transcript, progress_callback)
-    lines = summary.replace("—", "-").encode("latin-1", errors="replace").decode("latin-1").split("\n")
-    generate_pdf_from_text(lines[0], lines[1:], pdf_path, progress_callback)
+    summary = summarise_text_from_transcript(transcript, progress_callback)
+
+    if not summary or summary.startswith("[ERROR]"):
+        print("[ERROR] Summary generation failed. Content was:", summary)
+        summary = "Summary Unavailable\nCould not generate summary from transcript."
+
+    # Safely split into title and body
+    lines = sanitize_for_fpdf(summary).split("\n") # change bad characters
+
+    title = lines[0] if lines else "Summary Unavailable"
+    body = lines[1:] if len(lines) > 1 else ["No content available."]
+
+    generate_pdf_from_text(title, body, pdf_path, progress_callback)
+
+
 
 def generate_formatted_transcript_from_base_transcript(transcript, pdf_path, progress_callback=None):
     formatted = format_transcription(transcript, progress_callback)
-    lines = formatted.replace("—", "-").encode("latin-1", errors="replace").decode("latin-1").split("\n")
+    lines = sanitize_for_fpdf(formatted).split("\n")
     generate_pdf_from_text("Transcription", lines, pdf_path, progress_callback)
+
+
 
 def generate_math_pdf_from_transcipt(transcript, pdf_path, progress_callback = None):
     latex_file = generate_latex_from_transcript(transcript, "uploads", "Math_Transcription.tex", progress_callback)
+
+
+
     compile_latex_to_pdf(latex_file, pdf_path, progress_callback)
+
