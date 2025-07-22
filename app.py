@@ -228,23 +228,48 @@ def payment_success():
 def register():
     form = RegisterForm()
     if form.validate_on_submit():
-        hashed_pw = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
-        new_user = User(username=form.username.data, email=form.email.data, password=hashed_pw)
+        # Check if email or username already exist
+        existing_user_email = User.query.filter_by(email=form.email.data).first()
+        if existing_user_email:
+            flash("Email already registered. Try logging in instead.", "danger")
+            return render_template('register.html', form=form)
+
+        existing_user_username = User.query.filter_by(username=form.username.data).first()
+        if existing_user_username:
+            flash("Username already taken. Please choose another.", "danger")
+            return render_template('register.html', form=form)
+
+        # No conflicts, create user
+        hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
+        new_user = User(username=form.username.data,
+                        email=form.email.data,
+                        password=hashed_password,
+                        credits=10)
         db.session.add(new_user)
         db.session.commit()
-        flash('Account created!', 'success')
+        flash("Account created successfully. You can now log in.", "success")
         return redirect(url_for('login'))
+
     return render_template('register.html', form=form)
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data).first()
-        if user and bcrypt.check_password_hash(user.password, form.password.data):
+        identifier = form.username_or_email.data.strip()
+        user = User.query.filter(
+            (User.username == identifier) | (User.email == identifier)
+        ).first()
+
+        if not user:
+            form.username_or_email.errors.append("Username or email not found.")
+        elif not bcrypt.check_password_hash(user.password, form.password.data):
+            form.password.errors.append("Incorrect password.")
+        else:
             login_user(user)
             return redirect(url_for('index'))
-        flash('Login failed', 'danger')
+
     return render_template('login.html', form=form)
 
 @app.route('/logout')
