@@ -298,24 +298,159 @@ def clean_latex_unicode(text):
     Useful for sanitizing text before writing to a .tex file.
     """
     replacements = {
-        "−": "-",     # Unicode minus (U+2212) → ASCII hyphen
-        "–": "-",     # en dash (U+2013)
-        "—": "--",    # em dash (U+2014)
-        "“": "``",    # left double quote (U+201C)
-        "”": "''",    # right double quote (U+201D)
-        "‘": "`",     # left single quote (U+2018)
-        "’": "'",     # right single quote (U+2019)
-        "…": "...",   # ellipsis (U+2026)
-        "•": r"\textbullet{}",  # bullet point (U+2022)
-        "°": r"$^\circ$",       # degree symbol
-        "¼": r"\textonequarter{}",  # fraction
+        # Dashes and quotes
+        "−": "-",    # minus
+        "–": "-",    # en dash
+        "—": "--",   # em dash
+        "“": "``",   # left double quote
+        "”": "''",   # right double quote
+        "‘": "`",    # left single quote
+        "’": "'",    # right single quote
+        "‚": ",",    # single low-9 quotation mark
+        "„": ",,",   # double low-9 quotation mark
+
+        # Ellipsis, bullets, degrees, fractions
+        "…": "...",
+        "•": r"\textbullet{}",
+        "°": r"$^\circ$",
+        "¼": r"\textonequarter{}",
         "½": r"\textonehalf{}",
         "¾": r"\textthreequarters{}",
-        "©": r"\textcopyright{}",
-        "®": r"\textregistered{}",
+
+        # Currency and symbols
         "€": r"\euro{}",
         "£": r"\pounds{}",
+        "©": r"\textcopyright{}",
+        "®": r"\textregistered{}",
+        "™": r"\texttrademark{}",
         "\u00A0": " ",  # non-breaking space
+
+        # Mathematical operators
+        "×": r"\times",
+        "÷": r"\div",
+        "±": r"\pm",
+        "∓": r"\mp",
+        "≈": r"\approx",
+        "≠": r"\neq",
+        "≤": r"\leq",
+        "≥": r"\geq",
+        "∑": r"\sum",
+        "∏": r"\prod",
+        "√": r"\sqrt{}",
+        "∞": r"\infty",
+        "∫": r"\int",
+        "∂": r"\partial",
+        "∇": r"\nabla",
+        "∈": r"\in",
+        "∉": r"\notin",
+        "∩": r"\cap",
+        "∪": r"\cup",
+        "⊂": r"\subset",
+        "⊃": r"\supset",
+        "⊆": r"\subseteq",
+        "⊇": r"\supseteq",
+        "∧": r"\land",
+        "∨": r"\lor",
+        "¬": r"\neg",
+        "∀": r"\forall",
+        "∃": r"\exists",
+        "⇒": r"\Rightarrow",
+        "⇐": r"\Leftarrow",
+        "⇔": r"\Leftrightarrow",
+        "→": r"\rightarrow",
+        "←": r"\leftarrow",
+        "↔": r"\leftrightarrow",
+
+        # Greek lowercase letters
+        "α": r"\alpha",
+        "β": r"\beta",
+        "γ": r"\gamma",
+        "δ": r"\delta",
+        "ε": r"\epsilon",
+        "ζ": r"\zeta",
+        "η": r"\eta",
+        "θ": r"\theta",
+        "ι": r"\iota",
+        "κ": r"\kappa",
+        "λ": r"\lambda",
+        "μ": r"\mu",
+        "ν": r"\nu",
+        "ξ": r"\xi",
+        "ο": "o",
+        "π": r"\pi",
+        "ρ": r"\rho",
+        "σ": r"\sigma",
+        "τ": r"\tau",
+        "υ": r"\upsilon",
+        "φ": r"\phi",
+        "χ": r"\chi",
+        "ψ": r"\psi",
+        "ω": r"\omega",
+
+        # Greek uppercase letters
+        "Γ": r"\Gamma",
+        "Δ": r"\Delta",
+        "Θ": r"\Theta",
+        "Λ": r"\Lambda",
+        "Ξ": r"\Xi",
+        "Π": r"\Pi",
+        "Σ": r"\Sigma",
+        "Υ": r"\Upsilon",
+        "Φ": r"\Phi",
+        "Ψ": r"\Psi",
+        "Ω": r"\Omega",
+
+        # Greek variant letters
+        "ϵ": r"\varepsilon",
+        "ϑ": r"\vartheta",
+        "ϕ": r"\varphi",
+        "ς": r"\varsigma",
+
+        # Accents and diacritics (common examples)
+        "á": r"\'{a}",
+        "é": r"\'{e}",
+        "í": r"\'{i}",
+        "ó": r"\'{o}",
+        "ú": r"\'{u}",
+        "ñ": r"\~{n}",
+        "ü": r"\"{u}",
+        "ç": r"\c{c}",
+
+        # Miscellaneous symbols
+        "¶": r"\P",
+        "§": r"\S",
+        "†": r"\dagger",
+        "‡": r"\ddagger",
+        "‰": r"\permil",
+        "′": r"'",
+        "″": r"''",
+        "‴": r"'''",
+        "⁄": "/",
+
+        # Arrows (additional)
+        "↗": r"\nearrow",
+        "↘": r"\searrow",
+        "↙": r"\swarrow",
+        "↖": r"\nwarrow",
+        "⇑": r"\Uparrow",
+        "⇓": r"\Downarrow",
+
+        # Superscripts and subscripts
+        "¹": r"^{1}",
+        "²": r"^{2}",
+        "³": r"^{3}",
+
+        # Other symbols
+        "↦": r"\mapsto",
+        "∘": r"\circ",
+        "∙": r"\cdot",
+        "†": r"\dag",
+
+        # Thin spaces and spacing (optional, but often useful)
+        "\u2009": r"\,",      # thin space
+        "\u2002": r"\enspace",# en space
+        "\u2003": r"\quad",   # em space
+        "\u2011": "-",        # non-breaking hyphen
     }
 
     for bad_char, replacement in replacements.items():
