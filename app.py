@@ -411,5 +411,10 @@ def finalize_edits():
 
     return send_file(memory_file, as_attachment=True, download_name='edited_outputs.zip')
 
+
+@app.route("/examples")
+def examples():
+    return render_template("examples.html")
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')

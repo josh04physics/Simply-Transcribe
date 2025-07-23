@@ -27,36 +27,62 @@
     padding-top: 64px;
     min-height: 100vh;
   }
-
-  .header-bar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    background: var(--fg);
-    color: var(--bg);
-    padding: 12px 24px;
-    font-weight: 700;
-    font-size: 1.2em;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid var(--border);
-    z-index: 9999;
-  }
-
   .left-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;   /* prevents shrinking but not growth */
+  max-width: 150px; /* limits the left side width */
+}
+  .header-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background: var(--fg);
+  color: var(--bg);
+  padding: 12px 24px;
+  font-weight: 700;
+  font-size: 1.2em;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  z-index: 9999;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-grow: 1; /* take remaining space */
+  justify-content: flex-end;
+}
+
+.header-bar a {
+  color: var(--bg);       /* white text */
+  text-decoration: none;  /* no underline */
+  font-weight: 700;
+}
+
+.header-bar a:hover {
+  text-decoration: underline;
+}
+
+.header-username {
+  font-weight: 600;
+  font-size: 1em;
+  color: var(--bg);
   }
 
-  .site-logo {
-    height: 40px;
-    width: auto;
-    border-radius: 4px;
-    filter: grayscale(100%);
-  }
+ .site-logo {
+  height: 40px;  /* fixed height */
+  width: auto;
+  border-radius: 4px;
+  filter: grayscale(100%);
+  object-fit: contain; /* prevent distortion */
+  max-width: 100%;      /* prevent overflow */
+}
 
   .credits-icon {
     font-weight: 600;
@@ -245,23 +271,27 @@
 </style>
 </head>
 <body>
-  <div class="header-bar">
-    <div class="left-header">
-      <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="site-logo">
-    </div>
+
+<div class="header-bar">
+  <div class="left-header">
+    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="site-logo">
+  </div>
+
+  <div class="header-right">
     <div class="credits-icon" title="Your remaining credits">
       Credits: <span id="credits-count">{{ credits if credits is not none else 0 }}</span>
     </div>
-  </div>
 
-  <div class="user-info">
-    <div class="icon">👤</div>
+    <a href="{{ url_for('examples') }}">📝 View Example PDFs</a>
+
     {% if username %}
-      <div>{{ username }} (Credits: {{ credits }})</div>
+      <div class="header-username">👤 {{ username }}</div>
     {% else %}
-      <div>Guest</div>
+      <div class="header-username">👤 Guest</div>
     {% endif %}
   </div>
+</div>
+
 
   <div class="container">
     <h1>Audio to PDF Summary Generator</h1>

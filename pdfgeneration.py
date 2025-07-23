@@ -19,7 +19,6 @@ CHUNK_TARGET_SIZE = 24 * 1024 * 1024
 
 
 def sanitize_for_fpdf(text):
-
     replacements = {
         "—": "-",    # em dash
         "–": "-",    # en dash
@@ -45,6 +44,22 @@ def sanitize_for_fpdf(text):
         "\u200B": "",   # zero-width space (remove)
         "\u200C": "",   # zero-width non-joiner (remove)
         "\u200D": "",   # zero-width joiner (remove)
+
+        # Math symbols replacements
+        "∫": "integral of ",
+        "×": "x",    # multiplication sign → letter x
+        "÷": "/",    # division sign → slash
+        "√": "sqrt", # square root → textual substitute
+        "α": "alpha",
+        "β": "beta",
+        "γ": "gamma",
+        "Δ": "Delta",
+        "∞": "infinity",
+        "≈": "~",
+        "≠": "!=",
+        "≤": "<=",
+        "≥": ">=",
+
     }
 
     for original, replacement in replacements.items():
@@ -231,29 +246,47 @@ def chunk_text_by_tokens(text, max_tokens=20000):
 
     return chunks
 
+
 def generate_pdf_from_text(title, body_lines, output_path, progress_callback=None):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
+
+    # Title
     pdf.set_font("Arial", "B", 16)
     pdf.cell(0, 10, sanitize_for_fpdf(title), ln=True, align="C")
+    pdf.ln(10)
 
+    # Body
     pdf.set_font("Arial", size=12)
 
     if progress_callback:
         progress_callback(f"Writing {len(body_lines)} lines to PDF...")
 
-    for i, line in enumerate(body_lines):
-        clean_line = sanitize_for_fpdf(line)
-        pdf.multi_cell(0, 6, clean_line)
+    # Group lines into paragraphs by detecting blank lines
+    paragraphs = []
+    paragraph = []
+
+    for line in body_lines:
+        stripped = line.strip()
+        if stripped:
+            paragraph.append(sanitize_for_fpdf(stripped))
+        elif paragraph:
+            # Preserve line breaks within the paragraph
+            paragraphs.append("\n".join(paragraph))
+            paragraph = []
+    if paragraph:
+        paragraphs.append("\n".join(paragraph))
+
+    # Write each paragraph with spacing
+    for para in paragraphs:
+        pdf.multi_cell(0, 6, para)
+        pdf.ln(4)  # Add space between paragraphs
 
     pdf.output(output_path)
+
     if progress_callback:
         progress_callback(f"PDF generation complete: {output_path}")
-
-
-from docx import Document
-
 
 def generate_word_doc_from_text(title, body_lines, output_path, progress_callback=None):
     """
