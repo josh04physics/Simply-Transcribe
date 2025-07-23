@@ -116,7 +116,7 @@ def progress():
 @app.route('/buy-credits', methods=['GET', 'POST'])
 @login_required
 def buy_credits(): # For specifying amount (confusing name, change later??)
-    MIN_CREDITS = 250  # Minimum credits required to purchase
+    MIN_CREDITS = 125  # Minimum credits required to purchase
 
     if request.method == 'POST':
         try:
@@ -128,7 +128,7 @@ def buy_credits(): # For specifying amount (confusing name, change later??)
             flash('Invalid input for credits.', 'warning')
             return redirect(url_for('buy_credits'))
 
-        price_per_credit_cents = 2
+        price_per_credit_cents = 4
         amount_to_charge = credits_to_buy * price_per_credit_cents
 
         session = stripe.checkout.Session.create(
@@ -163,10 +163,10 @@ def create_checkout_session(): # For bundle (confusing names, change later?)
 
     # Define pricing (pence, i.e. 1600 = £16.00)
     prices = {
-        300: 540,
-        500: 850,
-        1000: 1600,
-        2000: 2500
+        200: 750,
+        500: 1800,
+        1000: 3500,
+        2000: 6800
     }
 
     price = prices.get(credit_amount)
