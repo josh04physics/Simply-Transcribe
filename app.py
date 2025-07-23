@@ -5,7 +5,7 @@ from flask_login import login_user, login_required, logout_user, LoginManager, c
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 import os
-from pdfgeneration import generate_summary_from_base_transcript, generate_formatted_transcript_from_base_transcript, transcribe_audio, generate_latex_pdf_from_transcipt, format_transcription, summarise_text_from_transcript, generate_pdf_from_text
+from pdfgeneration import transcribe_audio, generate_latex_pdf_from_transcipt, format_transcription, summarise_text_from_transcript, generate_pdf_from_text, generate_word_doc_from_text
 import zipfile
 import io
 from models import db
@@ -135,7 +135,7 @@ def buy_credits(): # For specifying amount (confusing name, change later??)
             payment_method_types=['card'],
             line_items=[{
                 'price_data': {
-                    'currency': 'usd',
+                    'currency': 'gbp',
                     'product_data': {
                         'name': f'{credits_to_buy} Credits',
                     },
@@ -371,12 +371,14 @@ def finalize_edits():
 
     # Generate transcript PDF if transcript text exists
     if edited_transcript:
-        transcript_paragraphs = [p.strip() for p in edited_transcript.split("\n") if p.strip()]
-        path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-transcript.pdf")
-        generate_pdf_from_text("Transcript", transcript_paragraphs, path)
-
         if 'transcript' in outputs:
-            output_files.append((path, "edited-transcript.pdf"))
+            transcript_paragraphs = [p.strip() for p in edited_transcript.split("\n") if p.strip()]
+            pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-transcript.pdf")
+            docx_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-transcript.docx")
+            generate_pdf_from_text("Transcript", transcript_paragraphs, pdf_path)
+            generate_word_doc_from_text("Transcript", transcript_paragraphs, docx_path)
+            output_files.append((pdf_path, "edited-transcript.pdf"))
+            output_files.append((docx_path, "edited-transcript.docx"))
 
         # Also generate LaTeX PDF if requested
         if 'latex' in outputs:
@@ -391,9 +393,12 @@ def finalize_edits():
     # Generate summary PDF if summary text exists
     if edited_summary:
         summary_paragraphs = [p.strip() for p in edited_summary.split("\n") if p.strip()]
-        path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-summary.pdf")
-        generate_pdf_from_text("Summary", summary_paragraphs, path)
-        output_files.append((path, "edited-summary.pdf"))
+        pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-summary.pdf")
+        docx_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-summary.docx")
+        generate_pdf_from_text("Summary", summary_paragraphs, pdf_path)
+        generate_word_doc_from_text("Summary", summary_paragraphs, docx_path)
+        output_files.append((pdf_path, "edited-summary.pdf"))
+        output_files.append((docx_path, "edited-summary.docx"))
 
     if not output_files:
         return "No transcript or summary content to generate PDFs from.", 400
@@ -408,14 +413,3 @@ def finalize_edits():
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
-
-'''
-if 'maths' in outputs:
-    math_pdf_transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{base_filename}-math_transcript.pdf")
-    generate_math_pdf_from_transcipt(transcript, math_pdf_transcript_path, progress_callback)
-    output_files.append((math_pdf_transcript_path, "math-transcript.pdf"))
-
-
-    math_tex_transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"Math_Transcription.tex")
-    output_files.append((math_tex_transcript_path, "math-transcript.tex")) # TEMPORARY (maybe add functionallity to pdfgeneration) upload TEX file as well
-'''

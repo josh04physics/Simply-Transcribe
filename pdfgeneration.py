@@ -8,7 +8,7 @@ import tempfile
 import tiktoken
 import subprocess
 import shutil
-
+from docx import Document
 
 
 load_dotenv()
@@ -251,6 +251,35 @@ def generate_pdf_from_text(title, body_lines, output_path, progress_callback=Non
     if progress_callback:
         progress_callback(f"PDF generation complete: {output_path}")
 
+
+from docx import Document
+
+
+def generate_word_doc_from_text(title, body_lines, output_path, progress_callback=None):
+    """
+    Generate a Word (.docx) document from title and body lines, saving to output_path.
+
+    Args:
+        title (str): Document title to add as heading.
+        body_lines (list of str): Lines of text for the document body.
+        output_path (str): File path to save the .docx file.
+        progress_callback (callable, optional): Function to receive progress messages.
+    """
+    doc = Document()
+
+    # Add title as heading
+    doc.add_heading(title, level=1)
+
+    if progress_callback:
+        progress_callback(f"Writing {len(body_lines)} lines to Word document...")
+
+    for line in body_lines:
+        doc.add_paragraph(line)
+
+    doc.save(output_path)
+
+    if progress_callback:
+        progress_callback(f"Word document generation complete: {output_path}")
 
 def generate_latex_from_transcript(transcript_text, output_dir="uploads", tex_filename="transcript_body.tex", progress_callback=None):
     import os
@@ -514,30 +543,6 @@ def compile_latex_to_pdf(latex_file, pdf_path, progress_callback=None):
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         if progress_callback:
             progress_callback(f"LaTeX compilation failed: {e}")
-
-
-def generate_summary_from_base_transcript(transcript, pdf_path, progress_callback=None): # NOT CURRENTLY IN USE..
-    summary = summarise_text_from_transcript(transcript, progress_callback)
-
-    if not summary or summary.startswith("[ERROR]"):
-        print("[ERROR] Summary generation failed. Content was:", summary)
-        summary = "Summary Unavailable\nCould not generate summary from transcript."
-
-    # Safely split into title and body
-    lines = sanitize_for_fpdf(summary).split("\n") # change bad characters
-
-    title = lines[0] if lines else "Summary Unavailable"
-    body = lines[1:] if len(lines) > 1 else ["No content available."]
-
-    generate_pdf_from_text(title, body, pdf_path, progress_callback)
-
-
-
-def generate_formatted_transcript_from_base_transcript(transcript, pdf_path, progress_callback=None): # NOT CURRENTLY IN USE
-    formatted = format_transcription(transcript, progress_callback)
-    lines = sanitize_for_fpdf(formatted).split("\n")
-    generate_pdf_from_text("Transcription", lines, pdf_path, progress_callback)
-
 
 
 def generate_latex_pdf_from_transcipt(transcript, pdf_path, progress_callback = None):
