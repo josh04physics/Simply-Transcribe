@@ -19,24 +19,38 @@ CHUNK_TARGET_SIZE = 24 * 1024 * 1024
 
 
 def sanitize_for_fpdf(text):
-    # Replace em dash and smart quotes with simple equivalents
-    replacements = {
-        "—": "-",  # em dash
-        "–": "-",  # en dash
-        "“": '"',
-        "”": '"',
-        "‘": "'",
-        "’": "'",
-        "…": "...",
-        "•": "-",  # bullets
-        " ": " ",  # narrow no-break space
-        "−": "-",  # minus sign
-        " ": " ",  # non-breaking space
-    }
-    for k, v in replacements.items():
-        text = text.replace(k, v)
 
-    # Ensure it's compatible with FPDF (Latin-1)
+    replacements = {
+        "—": "-",    # em dash
+        "–": "-",    # en dash
+        "‐": "-",    # hyphen (U+2010)
+        "―": "-",    # horizontal bar (U+2015)
+        "−": "-",    # minus sign
+        "‑": "-",    # non-breaking hyphen (U+2011)
+        "“": '"',    # left double quotation mark
+        "”": '"',    # right double quotation mark
+        "„": '"',    # double low-9 quotation mark
+        "‟": '"',    # double high-reversed-9 quotation mark
+        "‘": "'",    # left single quotation mark
+        "’": "'",    # right single quotation mark
+        "‚": "'",    # single low-9 quotation mark
+        "‛": "'",    # single high-reversed-9 quotation mark
+        "…": "...",  # ellipsis
+        "•": "-",    # bullet
+        "‧": ".",    # hyphenation point
+        "·": ".",    # middle dot
+        " ": " ",    # narrow no-break space (U+202F)
+        " ": " ",    # thin space (U+2009)
+        "\u00A0": " ",  # no-break space
+        "\u200B": "",   # zero-width space (remove)
+        "\u200C": "",   # zero-width non-joiner (remove)
+        "\u200D": "",   # zero-width joiner (remove)
+    }
+
+    for original, replacement in replacements.items():
+        text = text.replace(original, replacement)
+
+    # Finally encode to latin-1, replacing unsupported chars with '?'
     return text.encode("latin-1", errors="replace").decode("latin-1")
 
 def split_audio_by_size(file_path, chunk_target_size=CHUNK_TARGET_SIZE):
@@ -258,7 +272,7 @@ def generate_latex_from_transcript(transcript_text, output_dir="uploads", tex_fi
             model="o4-mini-2025-04-16",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that converts transcripts to LaTeX."},
-                {"role": "user", "content": f"Convert this into LaTeX body code with punctuation. Escape all special characters properly. Do NOT include document preamble or \\begin{{document}}:\n\n{chunk}"}
+                {"role": "user", "content": f"Convert this into LaTeX body code. Escape all special characters where necessary. Do NOT include document preamble or \\begin{{document}}:\n\n{chunk}"}
             ],
             max_completion_tokens=40000
         )
@@ -295,118 +309,132 @@ def generate_latex_from_transcript(transcript_text, output_dir="uploads", tex_fi
 def clean_latex_unicode(text):
     """
     Replaces problematic Unicode characters in GPT output with LaTeX-safe equivalents.
-    Useful for sanitizing text before writing to a .tex file.
+    Ensures math symbols are wrapped in $...$.
     """
+
     replacements = {
-        # Dashes and quotes
+        # Dashes and quotes (text mode)
         "−": "-",    # minus
         "–": "-",    # en dash
         "—": "--",   # em dash
-        "“": "``",   # left double quote
-        "”": "''",   # right double quote
-        "‘": "`",    # left single quote
-        "’": "'",    # right single quote
-        "‚": ",",    # single low-9 quotation mark
-        "„": ",,",   # double low-9 quotation mark
-
-        # Ellipsis, bullets, degrees, fractions
+        "“": "``",
+        "”": "''",
+        "‘": "`",
+        "’": "'",
+        "‚": ",",
+        "„": ",,",
         "…": "...",
         "•": r"\textbullet{}",
-        "°": r"$^\circ$",
+
+        # Fractions and symbols (text mode)
         "¼": r"\textonequarter{}",
         "½": r"\textonehalf{}",
         "¾": r"\textthreequarters{}",
-
-        # Currency and symbols
-        "€": r"\euro{}",
-        "£": r"\pounds{}",
         "©": r"\textcopyright{}",
         "®": r"\textregistered{}",
         "™": r"\texttrademark{}",
-        "\u00A0": " ",  # non-breaking space
+        "€": r"\euro{}",
+        "£": r"\pounds{}",
+        "°": r"$^\circ$",
 
-        # Mathematical operators
-        "×": r"\times",
-        "÷": r"\div",
-        "±": r"\pm",
-        "∓": r"\mp",
-        "≈": r"\approx",
-        "≠": r"\neq",
-        "≤": r"\leq",
-        "≥": r"\geq",
-        "∑": r"\sum",
-        "∏": r"\prod",
-        "√": r"\sqrt{}",
-        "∞": r"\infty",
-        "∫": r"\int",
-        "∂": r"\partial",
-        "∇": r"\nabla",
-        "∈": r"\in",
-        "∉": r"\notin",
-        "∩": r"\cap",
-        "∪": r"\cup",
-        "⊂": r"\subset",
-        "⊃": r"\supset",
-        "⊆": r"\subseteq",
-        "⊇": r"\supseteq",
-        "∧": r"\land",
-        "∨": r"\lor",
-        "¬": r"\neg",
-        "∀": r"\forall",
-        "∃": r"\exists",
-        "⇒": r"\Rightarrow",
-        "⇐": r"\Leftarrow",
-        "⇔": r"\Leftrightarrow",
-        "→": r"\rightarrow",
-        "←": r"\leftarrow",
-        "↔": r"\leftrightarrow",
+        # Math operators (math mode)
+        "×": r"$\times$",
+        "÷": r"$\div$",
+        "±": r"$\pm$",
+        "∓": r"$\mp$",
+        "≈": r"$\approx$",
+        "≠": r"$\neq$",
+        "≤": r"$\leq$",
+        "≥": r"$\geq$",
+        "∑": r"$\sum$",
+        "∏": r"$\prod$",
+        "√": r"$\sqrt{}$",
+        "∞": r"$\infty$",
+        "∫": r"$\int$",
+        "∂": r"$\partial$",
+        "∇": r"$\nabla$",
+        "∈": r"$\in$",
+        "∉": r"$\notin$",
+        "∩": r"$\cap$",
+        "∪": r"$\cup$",
+        "⊂": r"$\subset$",
+        "⊃": r"$\supset$",
+        "⊆": r"$\subseteq$",
+        "⊇": r"$\supseteq$",
+        "∧": r"$\land$",
+        "∨": r"$\lor$",
+        "¬": r"$\neg$",
+        "∀": r"$\forall$",
+        "∃": r"$\exists$",
+        "⇒": r"$\Rightarrow$",
+        "⇐": r"$\Leftarrow$",
+        "⇔": r"$\Leftrightarrow$",
+        "→": r"$\rightarrow$",
+        "←": r"$\leftarrow$",
+        "↔": r"$\leftrightarrow$",
 
-        # Greek lowercase letters
-        "α": r"\alpha",
-        "β": r"\beta",
-        "γ": r"\gamma",
-        "δ": r"\delta",
-        "ε": r"\epsilon",
-        "ζ": r"\zeta",
-        "η": r"\eta",
-        "θ": r"\theta",
-        "ι": r"\iota",
-        "κ": r"\kappa",
-        "λ": r"\lambda",
-        "μ": r"\mu",
-        "ν": r"\nu",
-        "ξ": r"\xi",
-        "ο": "o",
-        "π": r"\pi",
-        "ρ": r"\rho",
-        "σ": r"\sigma",
-        "τ": r"\tau",
-        "υ": r"\upsilon",
-        "φ": r"\phi",
-        "χ": r"\chi",
-        "ψ": r"\psi",
-        "ω": r"\omega",
+        # Greek lowercase (math mode)
+        "α": r"$\alpha$",
+        "β": r"$\beta$",
+        "γ": r"$\gamma$",
+        "δ": r"$\delta$",
+        "ε": r"$\epsilon$",
+        "ζ": r"$\zeta$",
+        "η": r"$\eta$",
+        "θ": r"$\theta$",
+        "ι": r"$\iota$",
+        "κ": r"$\kappa$",
+        "λ": r"$\lambda$",
+        "μ": r"$\mu$",
+        "ν": r"$\nu$",
+        "ξ": r"$\xi$",
+        "ο": "o",  # not a math symbol
+        "π": r"$\pi$",
+        "ρ": r"$\rho$",
+        "σ": r"$\sigma$",
+        "τ": r"$\tau$",
+        "υ": r"$\upsilon$",
+        "φ": r"$\phi$",
+        "χ": r"$\chi$",
+        "ψ": r"$\psi$",
+        "ω": r"$\omega$",
 
-        # Greek uppercase letters
-        "Γ": r"\Gamma",
-        "Δ": r"\Delta",
-        "Θ": r"\Theta",
-        "Λ": r"\Lambda",
-        "Ξ": r"\Xi",
-        "Π": r"\Pi",
-        "Σ": r"\Sigma",
-        "Υ": r"\Upsilon",
-        "Φ": r"\Phi",
-        "Ψ": r"\Psi",
-        "Ω": r"\Omega",
+        # Greek uppercase (math mode)
+        "Γ": r"$\Gamma$",
+        "Δ": r"$\Delta$",
+        "Θ": r"$\Theta$",
+        "Λ": r"$\Lambda$",
+        "Ξ": r"$\Xi$",
+        "Π": r"$\Pi$",
+        "Σ": r"$\Sigma$",
+        "Υ": r"$\Upsilon$",
+        "Φ": r"$\Phi$",
+        "Ψ": r"$\Psi$",
+        "Ω": r"$\Omega$",
 
-        # Greek variant letters
-        "ϵ": r"\varepsilon",
-        "ϑ": r"\vartheta",
-        "ϕ": r"\varphi",
-        "ς": r"\varsigma",
+        # Variant letters (math mode)
+        "ϵ": r"$\varepsilon$",
+        "ϑ": r"$\vartheta$",
+        "ϕ": r"$\varphi$",
+        "ς": r"$\varsigma$",
 
-        # Accents and diacritics (common examples)
+        # Arrows (math mode)
+        "↦": r"$\mapsto$",
+        "∘": r"$\circ$",
+        "∙": r"$\cdot$",
+        "↗": r"$\nearrow$",
+        "↘": r"$\searrow$",
+        "↙": r"$\swarrow$",
+        "↖": r"$\nwarrow$",
+        "⇑": r"$\Uparrow$",
+        "⇓": r"$\Downarrow$",
+
+        # Superscripts
+        "¹": r"$^{1}$",
+        "²": r"$^{2}$",
+        "³": r"$^{3}$",
+
+        # Accented Latin letters (text mode)
         "á": r"\'{a}",
         "é": r"\'{e}",
         "í": r"\'{i}",
@@ -416,7 +444,7 @@ def clean_latex_unicode(text):
         "ü": r"\"{u}",
         "ç": r"\c{c}",
 
-        # Miscellaneous symbols
+        # Misc text symbols
         "¶": r"\P",
         "§": r"\S",
         "†": r"\dagger",
@@ -427,30 +455,12 @@ def clean_latex_unicode(text):
         "‴": r"'''",
         "⁄": "/",
 
-        # Arrows (additional)
-        "↗": r"\nearrow",
-        "↘": r"\searrow",
-        "↙": r"\swarrow",
-        "↖": r"\nwarrow",
-        "⇑": r"\Uparrow",
-        "⇓": r"\Downarrow",
-
-        # Superscripts and subscripts
-        "¹": r"^{1}",
-        "²": r"^{2}",
-        "³": r"^{3}",
-
-        # Other symbols
-        "↦": r"\mapsto",
-        "∘": r"\circ",
-        "∙": r"\cdot",
-        "†": r"\dag",
-
-        # Thin spaces and spacing (optional, but often useful)
-        "\u2009": r"\,",      # thin space
-        "\u2002": r"\enspace",# en space
-        "\u2003": r"\quad",   # em space
-        "\u2011": "-",        # non-breaking hyphen
+        # Whitespace and spacing
+        "\u00A0": " ",
+        "\u2009": r"\,",        # thin space
+        "\u2002": r"\enspace",  # en space
+        "\u2003": r"\quad",     # em space
+        "\u2011": "-",          # non-breaking hyphen
     }
 
     for bad_char, replacement in replacements.items():
@@ -506,7 +516,7 @@ def compile_latex_to_pdf(latex_file, pdf_path, progress_callback=None):
             progress_callback(f"LaTeX compilation failed: {e}")
 
 
-def generate_summary_from_base_transcript(transcript, pdf_path, progress_callback=None):
+def generate_summary_from_base_transcript(transcript, pdf_path, progress_callback=None): # NOT CURRENTLY IN USE..
     summary = summarise_text_from_transcript(transcript, progress_callback)
 
     if not summary or summary.startswith("[ERROR]"):
@@ -523,17 +533,14 @@ def generate_summary_from_base_transcript(transcript, pdf_path, progress_callbac
 
 
 
-def generate_formatted_transcript_from_base_transcript(transcript, pdf_path, progress_callback=None):
+def generate_formatted_transcript_from_base_transcript(transcript, pdf_path, progress_callback=None): # NOT CURRENTLY IN USE
     formatted = format_transcription(transcript, progress_callback)
     lines = sanitize_for_fpdf(formatted).split("\n")
     generate_pdf_from_text("Transcription", lines, pdf_path, progress_callback)
 
 
 
-def generate_math_pdf_from_transcipt(transcript, pdf_path, progress_callback = None):
+def generate_latex_pdf_from_transcipt(transcript, pdf_path, progress_callback = None):
     latex_file = generate_latex_from_transcript(transcript, "uploads", "Math_Transcription.tex", progress_callback)
-
-
-
     compile_latex_to_pdf(latex_file, pdf_path, progress_callback)
 

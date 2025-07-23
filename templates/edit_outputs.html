@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Edit Transcript and Summary</title>
+  <style>
+    textarea {
+      width: 100%;
+      margin-bottom: 1em;
+      font-family: monospace;
+      padding: 1rem;
+      border: 1px solid #aaa;
+      background: #f9f9f9;
+      resize: vertical;
+    }
+    #progress-box {
+      margin-top: 1rem;
+      padding: 1rem;
+      border: 1px solid #ccc;
+      background: #f0f0f0;
+      font-family: sans-serif;
+      white-space: pre-line;
+    }
+  </style>
+</head>
+<body>
+  <h2 style="max-width: 900px; margin: auto; font-family: sans-serif; color: #111;">
+    Edit Your Transcript and Summary
+  </h2>
+
+  <form id="finalize-form" style="max-width: 900px; margin: auto; font-family: sans-serif; color: #111;">
+    {% if 'transcript' in selected_outputs or 'latex' in selected_outputs %}
+      <h2>Edit Transcript</h2>
+      <textarea name="transcript" rows="20">{{ formatted_transcript | e }}</textarea>
+    {% endif %}
+
+    {% if 'summary' in selected_outputs %}
+      <h2 style="margin-top: 2rem;">Edit Summary</h2>
+      <textarea name="summary" rows="10">{{ summary | e }}</textarea>
+    {% endif %}
+
+    {% for output in selected_outputs %}
+  <input type="hidden" name="outputs" value="{{ output }}">
+{% endfor %}
+
+  <input type="hidden" name="filename" value="{{ filename }}">
+
+  <!-- Note about LaTeX generation -->
+  {% if 'latex' in selected_outputs %}
+    <p style="margin-top: 1rem; font-size: 0.95em; color: #555;">
+      ✅ A LaTeX-based PDF and TeX file will be generated automatically, since it was selected earlier.
+    </p>
+  {% endif %}
+
+  <button type="submit" style="margin-top: 2rem; padding: 0.8rem 1.5rem; border: none; background: #111; color: #fff; font-weight: bold; cursor: pointer;">
+    Download File(s)
+  </button>
+    <div id="progress-box" style="display: none;"></div>
+  </form>
+
+  <script>
+    const form = document.getElementById("finalize-form");
+    const progressBox = document.getElementById("progress-box");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      progressBox.style.display = "block";
+      progressBox.textContent = "Starting PDF generation...\n";
+
+      // Open SSE connection to /progress
+      const eventSource = new EventSource("/progress");
+      eventSource.onmessage = (event) => {
+        if (event.data === "[DONE]") {
+          eventSource.close();
+        } else {
+          progressBox.textContent += event.data + "\n";
+        }
+      };
+
+      // Prepare form data
+      const formData = new FormData(form);
+
+      // Post to /finalize using fetch
+      const response = await fetch("/finalize", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "edited_outputs.zip";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+        progressBox.textContent += "\n✅ Download started!";
+      } else {
+        progressBox.textContent += "\n❌ Failed to generate PDF(s).";
+      }
+    });
+  </script>
+</body>
+</html>

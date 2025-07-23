@@ -150,11 +150,18 @@
     display: none;
   }
 
-  #progress-messages {
+   #progress-messages {
     white-space: pre-wrap;
+    font-family: sans-serif;
+    font-size: 0.95em;
+    line-height: 1.5;
+    background: #f9f9f9;
+    padding: 1em;
+    border: 1px solid #ccc;
+    margin-top: 1em;
     max-height: 300px;
     overflow-y: auto;
-    text-align: left;
+    color: #111;
   }
 
   .checkbox-group {
@@ -285,15 +292,15 @@
           Summary (pdf)
         </label>
         <label class="custom-checkbox">
-          <input type="checkbox" name="outputs" value="maths" checked>
+          <input type="checkbox" name="outputs" value="latex" checked>
           <span class="checkmark"></span>
-          Maths Transcript (tex and pdf)
+          LaTeX Transcript [Professional] (TeX and pdf)
         </label>
       </div>
 
       <p id="cost-estimate" style="font-size: 0.95em; color: #444; margin-bottom: 16px;"></p>
 
-      <button type="submit">Generate files</button>
+      <button type="submit">Generate and edit files</button>
     </form>
 
     <div id="loading">
@@ -312,12 +319,17 @@
 
     <details>
       <summary><strong>How is credit cost calculated?</strong></summary>
-      <p>It depends on the audio length and number of checkboxes selected. For each checkbox selected, one credit is charged for each minute of audio. For example, if you have a half hour recording, with both summary and latex transcript selected, you will be charged for 2 lots of 30 credits, so 60 credits in total.</p>
+      <p>Credit cost is based on your audio’s length and selected outputs: standard outputs (transcript, summary) cost 1 credit per minute each, while the LaTeX transcript costs 2 credits per minute. For example, a 30-minute audio with summary and LaTeX selected would cost 90 credits (30 × 1 + 30 × 2).</p>
     </details>
 
     <details>
       <summary><strong>Do credits expire?</strong></summary>
       <p>No, your purchased credits never expire.</p>
+    </details>
+
+    <details>
+      <summary><strong>What is a LaTeX transcript?</strong></summary>
+      <p>LaTeX is a document preparation system, popular in academia and scientific publishing, for typesetting documents with a focus on formatting and mathematical notation.</p>
     </details>
 
     <details>
@@ -340,47 +352,59 @@
   </div>
 
   <script>
-    const form = document.getElementById('upload-form');
-    const fileInput = document.querySelector('input[name="audio_file"]');
-    const costEstimate = document.getElementById('cost-estimate');
-    const loadingDiv = document.getElementById('loading');
-    const progressDiv = document.getElementById('progress-messages');
-    const outputCheckboxes = document.querySelectorAll('input[name="outputs"]');
+  const form = document.getElementById('upload-form');
+  const fileInput = document.querySelector('input[name="audio_file"]');
+  const costEstimate = document.getElementById('cost-estimate');
+  const loadingDiv = document.getElementById('loading');
+  const progressDiv = document.getElementById('progress-messages');
+  const outputCheckboxes = document.querySelectorAll('input[name="outputs"]');
 
-    function updateCostEstimate() {
-      const file = fileInput.files[0];
-      if (!file) {
-        costEstimate.textContent = '';
-        return;
-      }
-
-      const sizeInMB = file.size / (1024 * 1024);
-      const estimatedMinutes = Math.max(1, Math.ceil(sizeInMB));
-      const selectedOutputs = [...outputCheckboxes].filter(cb => cb.checked);
-      const outputCount = selectedOutputs.length;
-      const totalCredits = estimatedMinutes * outputCount;
-
-      costEstimate.textContent = `Estimated credit cost: ${totalCredits} credit${totalCredits !== 1 ? 's' : ''} (${estimatedMinutes} minute${estimatedMinutes !== 1 ? 's' : ''} × ${outputCount} output${outputCount !== 1 ? 's' : ''})`;
+  function updateCostEstimate() {
+    const file = fileInput.files[0];
+    if (!file) {
+      costEstimate.textContent = '';
+      return;
     }
 
-    fileInput.addEventListener('change', updateCostEstimate);
-    outputCheckboxes.forEach(cb => cb.addEventListener('change', updateCostEstimate));
+    const sizeInMB = file.size / (1024 * 1024);
+    const estimatedMinutes = Math.max(1, Math.ceil(sizeInMB));
 
-    form.addEventListener('submit', () => {
-      loadingDiv.style.display = 'block';
-      progressDiv.innerText = "Uploading file...";
+    let totalCredits = 0;
+    let details = [];
 
-      const eventSource = new EventSource('/progress');
-      eventSource.onmessage = function(event) {
-        if (event.data === "[DONE]") {
-          eventSource.close();
-          progressDiv.innerText += "\n✅ Done! Preparing your download...";
-        } else {
-          progressDiv.innerText += "\n" + event.data;
-        }
-        progressDiv.scrollTop = progressDiv.scrollHeight;
-      };
+    [...outputCheckboxes].forEach(cb => {
+      if (cb.checked) {
+        const isLatex = cb.value === 'latex';
+        const costPerMinute = isLatex ? 2 : 1;
+        const credits = estimatedMinutes * costPerMinute;
+        totalCredits += credits;
+        details.push(`${costPerMinute}×${estimatedMinutes} for ${cb.value}`);
+      }
     });
-  </script>
+
+    costEstimate.textContent =
+      `Estimated credit cost: ${totalCredits} credit${totalCredits !== 1 ? 's' : ''} ` +
+      `(${details.join(', ')})`;
+  }
+
+  fileInput.addEventListener('change', updateCostEstimate);
+  outputCheckboxes.forEach(cb => cb.addEventListener('change', updateCostEstimate));
+
+  form.addEventListener('submit', () => {
+    loadingDiv.style.display = 'block';
+    progressDiv.innerText = "Uploading file...";
+
+    const eventSource = new EventSource('/progress');
+    eventSource.onmessage = function(event) {
+      if (event.data === "[DONE]") {
+        eventSource.close();
+        progressDiv.innerText += "\n✅ Done! Preparing your download...";
+      } else {
+        progressDiv.innerText += "\n" + event.data;
+      }
+      progressDiv.scrollTop = progressDiv.scrollHeight;
+    };
+  });
+</script>
 </body>
 </html>

@@ -5,7 +5,7 @@ from flask_login import login_user, login_required, logout_user, LoginManager, c
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 import os
-from pdfgeneration import generate_summary_from_base_transcript, generate_formatted_transcript_from_base_transcript, transcribe_audio, generate_math_pdf_from_transcipt
+from pdfgeneration import generate_summary_from_base_transcript, generate_formatted_transcript_from_base_transcript, transcribe_audio, generate_latex_pdf_from_transcipt, format_transcription, summarise_text_from_transcript, generate_pdf_from_text
 import zipfile
 import io
 from models import db
@@ -338,40 +338,84 @@ def upload_file():
     # Prepare base filename (without extension)
     base_filename = os.path.splitext(file.filename)[0]
 
-    output_files = []
+    # Initialize variables
+    formatted_transcript = None
+    summary = None
 
-    if 'maths' in outputs:
-        math_pdf_transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{base_filename}-math_transcript.pdf")
-        generate_math_pdf_from_transcipt(transcript, math_pdf_transcript_path, progress_callback)
-        output_files.append((math_pdf_transcript_path, "math-transcript.pdf"))
-
-
-        math_tex_transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"Math_Transcription.tex")
-        output_files.append((math_tex_transcript_path, "math-transcript.tex")) # TEMPORARY (maybe add functionallity to pdfgeneration) upload TEX file as well
-
-
-    if 'transcript' in outputs:
-        transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{base_filename}-transcript.pdf")
-        generate_formatted_transcript_from_base_transcript(transcript, transcript_path, progress_callback)
-        output_files.append((transcript_path, "transcript.pdf"))
-
+    if 'transcript' in outputs or 'latex' in outputs:
+        formatted_transcript = format_transcription(transcript, progress_callback)
 
     if 'summary' in outputs:
-        summary_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{base_filename}-summary.pdf")
-        generate_summary_from_base_transcript(transcript, summary_path, progress_callback)
-        output_files.append((summary_path, "summary.pdf"))
-
+        summary = summarise_text_from_transcript(transcript, progress_callback)
 
     progress_callback("[DONE]")
 
-    # Create ZIP in-memory with only selected outputs
+    return render_template(
+        "edit_outputs.html",
+        formatted_transcript=formatted_transcript,
+        summary=summary,
+        filename=base_filename,
+        selected_outputs=outputs
+    )
+
+@app.route('/finalize', methods=['POST'])
+@login_required
+def finalize_edits():
+    edited_transcript = request.form.get("transcript", "").strip()
+    edited_summary = request.form.get("summary", "").strip()
+    filename = request.form.get("filename", "output").strip() or "output"
+
+    outputs = request.form.getlist('outputs') # check if requested earlier
+
+    output_files = []
+
+    # Generate transcript PDF if transcript text exists
+    if edited_transcript:
+        transcript_paragraphs = [p.strip() for p in edited_transcript.split("\n") if p.strip()]
+        path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-transcript.pdf")
+        generate_pdf_from_text("Transcript", transcript_paragraphs, path)
+
+        if 'transcript' in outputs:
+            output_files.append((path, "edited-transcript.pdf"))
+
+        # Also generate LaTeX PDF if requested
+        if 'latex' in outputs:
+            latex_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-transcript-latex.pdf")
+            generate_latex_pdf_from_transcipt(edited_transcript, latex_path, progress_callback)
+            output_files.append((latex_path, "edited-transcript-latex.pdf"))
+
+            math_tex_transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"Math_Transcription.tex")
+            output_files.append((math_tex_transcript_path,
+                                 "edited-transcript-latex.tex"))  # TEMPORARY (maybe add functionallity to pdfgeneration) upload TEX file as well
+
+    # Generate summary PDF if summary text exists
+    if edited_summary:
+        summary_paragraphs = [p.strip() for p in edited_summary.split("\n") if p.strip()]
+        path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-summary.pdf")
+        generate_pdf_from_text("Summary", summary_paragraphs, path)
+        output_files.append((path, "edited-summary.pdf"))
+
+    if not output_files:
+        return "No transcript or summary content to generate PDFs from.", 400
+
     memory_file = io.BytesIO()
     with zipfile.ZipFile(memory_file, 'w') as zf:
         for filepath, arcname in output_files:
             zf.write(filepath, arcname=arcname)
     memory_file.seek(0)
 
-    return send_file(memory_file, as_attachment=True, download_name='audio_outputs.zip')
+    return send_file(memory_file, as_attachment=True, download_name='edited_outputs.zip')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
+
+'''
+if 'maths' in outputs:
+    math_pdf_transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{base_filename}-math_transcript.pdf")
+    generate_math_pdf_from_transcipt(transcript, math_pdf_transcript_path, progress_callback)
+    output_files.append((math_pdf_transcript_path, "math-transcript.pdf"))
+
+
+    math_tex_transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"Math_Transcription.tex")
+    output_files.append((math_tex_transcript_path, "math-transcript.tex")) # TEMPORARY (maybe add functionallity to pdfgeneration) upload TEX file as well
+'''
