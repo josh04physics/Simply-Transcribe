@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Summary Sound</title>
+  <title>Simply Transcribe</title>
  <style>
   :root {
     --bg: #ffffff;
@@ -268,9 +268,49 @@
   a {
     color: var(--fg);
   }
+
+.feature-list {
+  width: 100%;
+  background: #f8f8f8;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 1em;
+  color: var(--fg);
+  text-align: center;
+  z-index: 10;
+}
+
+.feature-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.feature-list li {
+  font-weight: 500;
+}
+
+
 </style>
 </head>
 <body>
+
+<div class="feature-list">
+  <ul>
+    <li>⭐⭐⭐⭐⭐</li>
+    <li>✅ Cheapest transcription on the market</li>
+    <li>⚡ Powered by the latest AI models</li>
+    <li>📄 High-quality PDF, DOCX, and LaTeX output</li>
+    <li>🔁 Full credit refund guarantee</li>
+    <li>⭐⭐⭐⭐⭐</li>
+  </ul>
+</div>
+
+
 
 <div class="header-bar">
   <div class="left-header">
@@ -294,7 +334,7 @@
 
 
   <div class="container">
-    <h1>Audio to PDF Summary Generator</h1>
+    <h1>Generate your transcription or summary</h1>
 
     <div class="auth-buttons">
       {% if current_user.is_authenticated %}
@@ -358,7 +398,7 @@
     </details>
 
     <details>
-      <summary><strong>What is a LaTeX transcript?</strong></summary>
+      <summary><strong>What is LaTeX?</strong></summary>
       <p>LaTeX is a document preparation system, popular in academia and scientific publishing, for typesetting documents with a focus on formatting and mathematical notation.</p>
     </details>
 

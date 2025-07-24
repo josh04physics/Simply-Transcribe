@@ -1,9 +1,7 @@
 from flask import Flask, request, render_template, send_file, url_for, redirect, flash, Response, stream_with_context, jsonify
-import time
 import queue
 from flask_login import login_user, login_required, logout_user, LoginManager, current_user
 from flask_migrate import Migrate
-from flask_sqlalchemy import SQLAlchemy
 import os
 from pdfgeneration import transcribe_audio, generate_latex_pdf_from_transcipt, format_transcription, summarise_text_from_transcript, generate_pdf_from_text, generate_word_doc_from_text
 import zipfile
@@ -24,7 +22,7 @@ load_dotenv()
 
 app = Flask(__name__, instance_relative_config=True)
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['SECRET_KEY'] = 'your_secret_key'
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY") # get stripe data (different locally and on render)
 YOUR_DOMAIN = os.getenv("YOUR_DOMAIN")  # e.g. https://yourdomai
@@ -128,7 +126,7 @@ def buy_credits(): # For specifying amount (confusing name, change later??)
             flash('Invalid input for credits.', 'warning')
             return redirect(url_for('buy_credits'))
 
-        price_per_credit_cents = 4
+        price_per_credit_cents = 3
         amount_to_charge = credits_to_buy * price_per_credit_cents
 
         session = stripe.checkout.Session.create(
@@ -163,10 +161,10 @@ def create_checkout_session(): # For bundle (confusing names, change later?)
 
     # Define pricing (pence, i.e. 1600 = £16.00)
     prices = {
-        200: 750,
-        500: 1800,
-        1000: 3500,
-        2000: 6800
+        200: 560,
+        500: 1350,
+        1000: 2600,
+        2000: 5000
     }
 
     price = prices.get(credit_amount)
@@ -417,4 +415,4 @@ def examples():
     return render_template("examples.html")
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0')
+    app.run(host='0.0.0.0')
