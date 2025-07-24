@@ -26,8 +26,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Optional: unbuffer logs for Docker
 ENV PYTHONUNBUFFERED=1
 
-# Expose the port your Flask app uses
-EXPOSE 5000
+# Expose the port your app listens on
+EXPOSE 8000
 
-# Run the Flask app
-CMD ["python", "app.py"]
+# Run the app with gunicorn in production mode
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "app:app"]
