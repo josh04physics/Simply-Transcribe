@@ -1,7 +1,7 @@
 # Base Python image
 FROM python:3.11-slim
 
-# Install system dependencies including ffmpeg (which includes ffprobe), TeXLive and font support
+# Install system dependencies including ffmpeg, TeXLive and font support
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     texlive-latex-base \
@@ -17,7 +17,7 @@ WORKDIR /app
 # Copy all project files (including ./bin/ffmpeg)
 COPY . /app
 
-# Make local ffmpeg executable and move to global path if you still want to override system ffmpeg
+# Make local ffmpeg executable and move to global path if provided
 RUN chmod +x ./bin/ffmpeg && mv ./bin/ffmpeg /usr/local/bin/ffmpeg || echo "No local ffmpeg binary to move"
 
 # Install Python dependencies
@@ -29,5 +29,5 @@ ENV PYTHONUNBUFFERED=1
 # Expose the port your app listens on
 EXPOSE 8000
 
-# Run the app with gunicorn in production mode
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "app:app"]
+# Run the app with Gunicorn (4 workers, 2 threads per worker, 120s timeout)
+CMD ["gunicorn", "--workers=4", "--threads=2", "--timeout=120", "--bind=0.0.0.0:8000", "app:app"]
