@@ -21,7 +21,7 @@ load_dotenv()
 
 app = Flask(__name__, instance_relative_config=True)
 
-executor = ThreadPoolExecutor(max_workers=4)
+executor = ThreadPoolExecutor(max_workers=1)
 
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
@@ -56,11 +56,6 @@ db.init_app(app)
 with app.app_context():
     if database_url.startswith("sqlite:///") and not os.path.exists(db_path):
         db.create_all()
-
-
-
-
-
 
 
 def set_ffmpeg_path():
@@ -416,4 +411,4 @@ def examples():
     return render_template("examples.html")
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0')
+    app.run(host='0.0.0.0', debug=True)
