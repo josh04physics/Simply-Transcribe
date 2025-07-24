@@ -1,11 +1,7 @@
 from flask import Flask, request, render_template, send_file, url_for, redirect, flash, Response, stream_with_context, jsonify
-import queue
 from flask_login import login_user, login_required, logout_user, LoginManager, current_user
 from flask_migrate import Migrate
 import os
-from pdfgeneration import transcribe_audio, generate_latex_pdf_from_transcipt, format_transcription, summarise_text_from_transcript, generate_pdf_from_text, generate_word_doc_from_text
-import zipfile
-import io
 from models import db
 from models.user import User
 from forms.forms import RegisterForm, LoginForm
@@ -15,12 +11,18 @@ from pydub.utils import which
 from pydub import AudioSegment
 from dotenv import load_dotenv
 import stripe
-
+from concurrent.futures import ThreadPoolExecutor
+import threading
+from tasks import background_process_file, background_generate_outputs
+from utils import results_cache, progress_queues
 
 load_dotenv()
 
 
 app = Flask(__name__, instance_relative_config=True)
+
+executor = ThreadPoolExecutor(max_workers=4)
+
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
@@ -57,11 +59,7 @@ with app.app_context():
 
 
 
-progress_queue = queue.Queue() # for real time updates on pdf generation
 
-
-def progress_callback(message):
-    progress_queue.put(message)
 
 
 
@@ -100,17 +98,22 @@ bcrypt = Bcrypt(app)
 migrate = Migrate(app, db) # To allow columns to be added using terminal
 
 
-
 @app.route("/progress")
 def progress():
+    filename = request.args.get("filename")
+    q = progress_queues.get(filename)
+
     def generate():
+        if not q:
+            yield f"data: Waiting for progress...\n\n"
+            return
         while True:
-            message = progress_queue.get()
+            message = q.get()
             yield f"data: {message}\n\n"
             if message == "[DONE]":
                 break
-    return Response(stream_with_context(generate()), content_type='text/event-stream')
 
+    return Response(stream_with_context(generate()), content_type='text/event-stream')
 @app.route('/buy-credits', methods=['GET', 'POST'])
 @login_required
 def buy_credits(): # For specifying amount (confusing name, change later??)
@@ -295,16 +298,11 @@ def index(): # MAIN HOMEPAGE
 @app.route('/upload', methods=['POST'])
 @login_required
 def upload_file():
-    if 'audio_file' not in request.files:
-        flash("No file part", "danger")
+    file = request.files.get('audio_file')
+    if not file or file.filename == '':
+        flash("No file selected", "danger")
         return redirect(url_for('index'))
 
-    file = request.files['audio_file']
-    if file.filename == '':
-        flash("No selected file", "danger")
-        return redirect(url_for('index'))
-
-    # Get selected outputs from form checkboxes (list of strings)
     outputs = request.form.getlist('outputs')
     if not outputs:
         flash("Please select at least one output type.", "warning")
@@ -313,48 +311,44 @@ def upload_file():
     audio_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
     file.save(audio_path)
 
-    # --- STEP 1: Calculate duration in minutes using pydub ---
     try:
         audio = AudioSegment.from_file(audio_path)
-        duration_minutes = max(1, -(-len(audio) // 60000))  # ceil in ms
+        duration_minutes = max(1, -(-len(audio) // 60000))
     except Exception as e:
-        flash(f"Failed to read audio: {str(e)}", "danger")
+        flash(f"Failed to read audio: {e}", "danger")
         return redirect(url_for('index'))
 
-    # --- STEP 2: Check if user has enough credits ---
     if current_user.credits < duration_minutes:
-        flash(f"You need {duration_minutes} credits, but you only have {current_user.credits}.", "warning")
+        flash(f"You need {duration_minutes} credits, but have {current_user.credits}.", "warning")
         return redirect(url_for('index'))
 
-    # --- STEP 3: Deduct credits ---
     current_user.credits -= duration_minutes
     db.session.commit()
 
-    # --- STEP 4: Transcribe audio ---
-    transcript = transcribe_audio(audio_path, progress_callback)
-
-    # Prepare base filename (without extension)
     base_filename = os.path.splitext(file.filename)[0]
 
-    # Initialize variables
-    formatted_transcript = None
-    summary = None
+    # Fire off background task
+    thread = threading.Thread(target=background_process_file, args=(app, audio_path, base_filename, outputs))
+    thread.start()
 
-    if 'transcript' in outputs or 'latex' in outputs:
-        formatted_transcript = format_transcription(transcript, progress_callback)
+    return render_template("processing.html", filename=base_filename)
 
-    if 'summary' in outputs:
-        summary = summarise_text_from_transcript(transcript, progress_callback)
 
-    progress_callback("[DONE]")
+@app.route('/check_results/<filename>')
+@login_required
+def check_results(filename):
+    result = results_cache.get(filename)
+    if result:
+        return render_template(
+            "edit_outputs.html",
+            formatted_transcript=result["transcript"],
+            summary=result["summary"],
+            filename=filename,
+            selected_outputs=result["outputs"]
+        )
+    else:
+        return "", 202  # Not ready yet
 
-    return render_template(
-        "edit_outputs.html",
-        formatted_transcript=formatted_transcript,
-        summary=summary,
-        filename=base_filename,
-        selected_outputs=outputs
-    )
 
 @app.route('/finalize', methods=['POST'])
 @login_required
@@ -362,52 +356,59 @@ def finalize_edits():
     edited_transcript = request.form.get("transcript", "").strip()
     edited_summary = request.form.get("summary", "").strip()
     filename = request.form.get("filename", "output").strip() or "output"
+    outputs = request.form.getlist('outputs')
 
-    outputs = request.form.getlist('outputs') # check if requested earlier
-
-    output_files = []
-
-    # Generate transcript PDF if transcript text exists
-    if edited_transcript:
-        if 'transcript' in outputs:
-            transcript_paragraphs = [p.strip() for p in edited_transcript.split("\n") if p.strip()]
-            pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-transcript.pdf")
-            docx_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-transcript.docx")
-            generate_pdf_from_text("Transcript", transcript_paragraphs, pdf_path)
-            generate_word_doc_from_text("Transcript", transcript_paragraphs, docx_path)
-            output_files.append((pdf_path, "edited-transcript.pdf"))
-            output_files.append((docx_path, "edited-transcript.docx"))
-
-        # Also generate LaTeX PDF if requested
-        if 'latex' in outputs:
-            latex_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-transcript-latex.pdf")
-            generate_latex_pdf_from_transcipt(edited_transcript, latex_path, progress_callback)
-            output_files.append((latex_path, "edited-transcript-latex.pdf"))
-
-            math_tex_transcript_path = os.path.join(app.config['UPLOAD_FOLDER'], f"Math_Transcription.tex")
-            output_files.append((math_tex_transcript_path,
-                                 "edited-transcript-latex.tex"))  # TEMPORARY (maybe add functionallity to pdfgeneration) upload TEX file as well
-
-    # Generate summary PDF if summary text exists
-    if edited_summary:
-        summary_paragraphs = [p.strip() for p in edited_summary.split("\n") if p.strip()]
-        pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-summary.pdf")
-        docx_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-summary.docx")
-        generate_pdf_from_text("Summary", summary_paragraphs, pdf_path)
-        generate_word_doc_from_text("Summary", summary_paragraphs, docx_path)
-        output_files.append((pdf_path, "edited-summary.pdf"))
-        output_files.append((docx_path, "edited-summary.docx"))
-
-    if not output_files:
+    if not edited_transcript and not edited_summary:
         return "No transcript or summary content to generate PDFs from.", 400
 
-    memory_file = io.BytesIO()
-    with zipfile.ZipFile(memory_file, 'w') as zf:
-        for filepath, arcname in output_files:
-            zf.write(filepath, arcname=arcname)
-    memory_file.seek(0)
+    thread = threading.Thread(target=background_generate_outputs, args=(
+        app,
+        edited_transcript,
+        edited_summary,
+        filename,
+        outputs
+    ))
+    thread.start()
 
-    return send_file(memory_file, as_attachment=True, download_name='edited_outputs.zip')
+    return render_template("processing_final.html", filename=filename)
+
+@app.route("/processing_final")
+@login_required
+def processing_final():
+    filename = request.args.get("filename")
+    return render_template("processing_final.html", filename=filename)
+
+@app.route("/download_ready/<filename>")
+@login_required
+def download_ready(filename):
+    result = results_cache.get(filename)
+    if result and result.get("zip_ready"):
+        return "", 200
+    return "", 202
+
+
+@app.route('/download_zip/<filename>')
+@login_required
+def download_zip(filename):
+    result = results_cache.get(filename)
+    if not result or not result.get("zip_ready"):
+        return "Still processing. Please wait.", 202
+
+    memory_file = result.get("zip_data")
+    if not memory_file:
+        return "ZIP not found", 404
+    memory_file.seek(0)
+    return send_file(
+        memory_file,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=f"{filename}_outputs.zip"
+    )
+
+@app.route("/success")
+@login_required
+def success():
+    return render_template("success.html")
 
 
 @app.route("/examples")

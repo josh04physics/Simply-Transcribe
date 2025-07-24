@@ -310,8 +310,6 @@
   </ul>
 </div>
 
-
-
 <div class="header-bar">
   <div class="left-header">
     <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="site-logo">
@@ -332,46 +330,45 @@
   </div>
 </div>
 
+<div class="container">
+  <h1>Generate your transcription or summary</h1>
 
-  <div class="container">
-    <h1>Generate your transcription or summary</h1>
+  <div class="auth-buttons">
+    {% if current_user.is_authenticated %}
+      <a href="{{ url_for('buy_credits') }}">Buy Credits</a>
+      <a href="{{ url_for('logout') }}" style="background-color: #dc3545;">Logout</a>
+    {% else %}
+      <a href="{{ url_for('login') }}">Login</a>
+      <a href="{{ url_for('register') }}" class="register-btn">Register</a>
+      <a href="{{ url_for('buy_credits') }}">Buy Credits</a>
+    {% endif %}
+  </div>
 
-    <div class="auth-buttons">
-      {% if current_user.is_authenticated %}
-        <a href="{{ url_for('buy_credits') }}">Buy Credits</a>
-        <a href="{{ url_for('logout') }}" style="background-color: #dc3545;">Logout</a>
-      {% else %}
-        <a href="{{ url_for('login') }}">Login</a>
-        <a href="{{ url_for('register') }}" class="register-btn">Register</a>
-        <a href="{{ url_for('buy_credits') }}">Buy Credits</a>
-      {% endif %}
+  <form id="upload-form" method="POST" action="/upload" enctype="multipart/form-data">
+    <input type="file" name="audio_file" accept="audio/*" required>
+
+    <div class="checkbox-group" style="margin: 20px 0;">
+      <label class="custom-checkbox">
+        <input type="checkbox" name="outputs" value="transcript" checked>
+        <span class="checkmark"></span>
+        Transcript (pdf and docx)
+      </label>
+      <label class="custom-checkbox">
+        <input type="checkbox" name="outputs" value="summary" checked>
+        <span class="checkmark"></span>
+        Summary (pdf and docx)
+      </label>
+      <label class="custom-checkbox">
+        <input type="checkbox" name="outputs" value="latex" checked>
+        <span class="checkmark"></span>
+        LaTeX Transcript [Professional] (TeX and pdf)
+      </label>
     </div>
 
-    <form id="upload-form" method="POST" action="/upload" enctype="multipart/form-data">
-      <input type="file" name="audio_file" accept="audio/*" required>
+    <p id="cost-estimate" style="font-size: 0.95em; color: #444; margin-bottom: 16px;"></p>
 
-      <div class="checkbox-group" style="margin: 20px 0;">
-        <label class="custom-checkbox">
-          <input type="checkbox" name="outputs" value="transcript" checked>
-          <span class="checkmark"></span>
-          Transcript (pdf and docx)
-        </label>
-        <label class="custom-checkbox">
-          <input type="checkbox" name="outputs" value="summary" checked>
-          <span class="checkmark"></span>
-          Summary (pdf and docx)
-        </label>
-        <label class="custom-checkbox">
-          <input type="checkbox" name="outputs" value="latex" checked>
-          <span class="checkmark"></span>
-          LaTeX Transcript [Professional] (TeX and pdf)
-        </label>
-      </div>
-
-      <p id="cost-estimate" style="font-size: 0.95em; color: #444; margin-bottom: 16px;"></p>
-
-      <button type="submit">Generate and edit files</button>
-    </form>
+    <button type="submit">Generate and edit files</button>
+  </form>
 
     <div id="loading">
       <div id="progress-messages">Generating PDF, please wait...</div>
@@ -422,11 +419,8 @@
   </div>
 
   <script>
-  const form = document.getElementById('upload-form');
   const fileInput = document.querySelector('input[name="audio_file"]');
   const costEstimate = document.getElementById('cost-estimate');
-  const loadingDiv = document.getElementById('loading');
-  const progressDiv = document.getElementById('progress-messages');
   const outputCheckboxes = document.querySelectorAll('input[name="outputs"]');
 
   function updateCostEstimate() {
@@ -460,21 +454,7 @@
   fileInput.addEventListener('change', updateCostEstimate);
   outputCheckboxes.forEach(cb => cb.addEventListener('change', updateCostEstimate));
 
-  form.addEventListener('submit', () => {
-    loadingDiv.style.display = 'block';
-    progressDiv.innerText = "Uploading file...";
-
-    const eventSource = new EventSource('/progress');
-    eventSource.onmessage = function(event) {
-      if (event.data === "[DONE]") {
-        eventSource.close();
-        progressDiv.innerText += "\n✅ Done! Preparing your download...";
-      } else {
-        progressDiv.innerText += "\n" + event.data;
-      }
-      progressDiv.scrollTop = progressDiv.scrollHeight;
-    };
-  });
+  // Removed the form submit event listener with EventSource for progress callback
 </script>
 </body>
 </html>

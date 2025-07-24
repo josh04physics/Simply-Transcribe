@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Generating Outputs...</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background-color: #f7f9fc;
+      margin: 0;
+      text-align: center;
+      padding: 1rem;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    p {
+      color: #666;
+      font-size: 1.1rem;
+    }
+
+    #progress {
+            width: 100%;
+            max-width: 600px;
+            height: 150px;
+            overflow-y: auto;
+            background: #ffffff;
+            border: 1px solid #ccc;
+            padding: 1rem;
+            color: #222;
+            font-family: monospace;
+            white-space: pre-wrap;
+            border-radius: 4px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+        }
+
+    .spinner {
+      margin-top: 30px;
+      width: 50px;
+      height: 50px;
+      border: 6px solid #e0e0e0;
+      border-top: 6px solid #007bff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <h1>Generating your outputs...</h1>
+  <p>Please wait while we generate your PDFs and ZIP file.</p>
+  <div class="spinner"></div>
+  <div id="progress">Waiting for files to be ready...</div>
+
+  <script>
+    const filename = "{{ filename }}";
+    const progressBox = document.getElementById("progress");
+
+    const eventSource = new EventSource(`/progress?filename=${encodeURIComponent(filename)}`);
+
+
+    eventSource.onmessage = function(event) {
+      if (event.data === "[DONE]") {
+        progressBox.textContent += "\n✅ Files ready. Downloading...";
+        eventSource.close();
+
+        const link = document.createElement("a");
+        link.href = `/download_zip/${filename}`;
+        link.download = `${filename}_outputs.zip`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        setTimeout(() => {
+          window.location.href = "/success";
+        }, 2000);
+      } else {
+        if(progressBox.textContent === "Waiting for files to be ready...") {
+          progressBox.textContent = ""; // Clear placeholder on first update
+        }
+        progressBox.textContent += "\n" + event.data;
+        progressBox.scrollTop = progressBox.scrollHeight;
+      }
+    };
+
+    eventSource.onerror = function() {
+      progressBox.textContent += "\n❌ Connection lost. Trying fallback polling...";
+      eventSource.close();
+      startPolling();
+    };
+
+    async function poll() {
+      try {
+        const res = await fetch(`/download_ready/${filename}`);
+        if (res.status === 200) {
+          progressBox.textContent += "\n✅ Files ready. Downloading...";
+
+          const link = document.createElement("a");
+          link.href = `/download_zip/${filename}`;
+          link.download = `${filename}_outputs.zip`;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => {
+            window.location.href = "/success";
+          }, 2000);
+        } else {
+          setTimeout(poll, 3000);
+        }
+      } catch (err) {
+        progressBox.textContent += `\n❌ Error: ${err.message}`;
+        setTimeout(poll, 5000);
+      }
+    }
+
+    function startPolling() {
+      poll();
+    }
+  </script>
+</body>
+</html>

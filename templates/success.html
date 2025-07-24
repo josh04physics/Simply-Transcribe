@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Download Complete</title>
+  <style>
+    body {
+      background-color: #fff;
+      color: #000;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    p {
+      font-size: 1.1rem;
+      margin-bottom: 2rem;
+    }
+
+    .home-link {
+      padding: 10px 20px;
+      background: transparent;
+      border: 1px solid #000;
+      color: #000;
+      text-decoration: none;
+      font-weight: bold;
+      border-radius: 6px;
+      transition: background-color 0.2s ease;
+    }
+
+    .home-link:hover {
+      background-color: #000;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>✅ Success!</h1>
+  <p>Your download has started.</p>
+
+  <a href="{{ url_for('index') }}" class="home-link">🏠 Back to Homepage</a>
+
+</body>
+</html>

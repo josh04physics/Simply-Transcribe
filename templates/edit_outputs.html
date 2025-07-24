@@ -39,21 +39,20 @@
     {% endif %}
 
     {% for output in selected_outputs %}
-  <input type="hidden" name="outputs" value="{{ output }}">
-{% endfor %}
+      <input type="hidden" name="outputs" value="{{ output }}">
+    {% endfor %}
+    <input type="hidden" name="filename" value="{{ filename }}">
 
-  <input type="hidden" name="filename" value="{{ filename }}">
+    {% if 'latex' in selected_outputs %}
+      <p style="margin-top: 1rem; font-size: 0.95em; color: #555;">
+        ✅ A LaTeX-based PDF and TeX file will be generated automatically based on your edited transcript.
+      </p>
+    {% endif %}
 
-  <!-- Note about LaTeX generation -->
-  {% if 'latex' in selected_outputs %}
-    <p style="margin-top: 1rem; font-size: 0.95em; color: #555;">
-      ✅ A LaTeX-based PDF and TeX file will be generated automatically, based on your edited transcript.
-    </p>
-  {% endif %}
+    <button type="submit" style="margin-top: 2rem; padding: 0.8rem 1.5rem; border: none; background: #111; color: #fff; font-weight: bold; cursor: pointer;">
+      Finalize and Generate Outputs
+    </button>
 
-  <button type="submit" style="margin-top: 2rem; padding: 0.8rem 1.5rem; border: none; background: #111; color: #fff; font-weight: bold; cursor: pointer;">
-    Download File(s)
-  </button>
     <div id="progress-box" style="display: none;"></div>
   </form>
 
@@ -66,38 +65,25 @@
       progressBox.style.display = "block";
       progressBox.textContent = "Starting PDF generation...\n";
 
-      // Open SSE connection to /progress
-      const eventSource = new EventSource("/progress");
-      eventSource.onmessage = (event) => {
-        if (event.data === "[DONE]") {
-          eventSource.close();
-        } else {
-          progressBox.textContent += event.data + "\n";
-        }
-      };
-
-      // Prepare form data
       const formData = new FormData(form);
+      const filename = formData.get("filename");
 
-      // Post to /finalize using fetch
-      const response = await fetch("/finalize", {
-        method: "POST",
-        body: formData,
-      });
+      // Post to /finalize to trigger background processing
+      try {
+        const response = await fetch("/finalize", {
+          method: "POST",
+          body: formData
+        });
 
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = "edited_outputs.zip";
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
-        progressBox.textContent += "\n✅ Download started!";
-      } else {
-        progressBox.textContent += "\n❌ Failed to generate PDF(s).";
+        if (response.ok) {
+          progressBox.textContent += "\n🕓 Preparing your files...";
+          // Redirect to new page that shows final progress
+          window.location.href = "/processing_final?filename=" + encodeURIComponent(filename);
+        } else {
+          progressBox.textContent += "\n❌ Failed to submit edits. Please try again.";
+        }
+      } catch (err) {
+        progressBox.textContent += "\n❌ Network error: " + err.message;
       }
     });
   </script>

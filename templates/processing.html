@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Processing File</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #f7f9fc;
+            margin: 0;
+            padding: 1rem;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        p {
+            color: #666;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+        .spinner {
+            margin-bottom: 30px;
+            width: 50px;
+            height: 50px;
+            border: 6px solid #e0e0e0;
+            border-top: 6px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        #progress-messages {
+            width: 100%;
+            max-width: 600px;
+            height: 150px;
+            overflow-y: auto;
+            background: #ffffff;
+            border: 1px solid #ccc;
+            padding: 1rem;
+            color: #222;
+            font-family: monospace;
+            white-space: pre-wrap;
+            border-radius: 4px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <h1>Processing your file...</h1>
+    <p>Please wait. This may take a minute or two.</p>
+    <div class="spinner"></div>
+
+    <div id="progress-messages">Waiting for progress updates...</div>
+
+    <script>
+        const filename = "{{ filename }}";
+        const progressDiv = document.getElementById('progress-messages');
+
+        // Open SSE connection to listen for progress updates
+        const eventSource = new EventSource(`/progress?filename=${encodeURIComponent(filename)}`);
+
+
+        eventSource.onmessage = function(event) {
+            if (event.data === "[DONE]") {
+                progressDiv.textContent += "\n✅ Processing complete.";
+                eventSource.close();
+                window.location.href = `/check_results/${filename}`;
+            } else {
+                if(progressDiv.textContent === "Waiting for progress updates...") {
+                    progressDiv.textContent = "";  // clear placeholder on first message
+                }
+                progressDiv.textContent += "\n" + event.data;
+            }
+            progressDiv.scrollTop = progressDiv.scrollHeight;
+        };
+
+        eventSource.onerror = function() {
+            progressDiv.textContent += "\n❌ Connection lost. Trying fallback polling...";
+            eventSource.close();
+            startPolling();
+        };
+
+        // Original polling fallback to check if result ready
+        async function poll() {
+            try {
+                const checkResults = await fetch(`/check_results/${filename}`);
+                if (checkResults.status === 200) {
+                    // Transcript & summary ready, go to edit page
+                    window.location.href = `/check_results/${filename}`;
+                    return;
+                }
+                // Not ready yet; try again in 3 seconds
+                setTimeout(poll, 3000);
+            } catch (err) {
+                console.error("Polling failed:", err);
+                setTimeout(poll, 5000);
+            }
+        }
+
+        // Start polling after SSE error
+        function startPolling() {
+            poll();
+        }
+
+        // You can optionally start polling right away as backup, but SSE should be first priority
+        // poll();
+    </script>
+</body>
+</html>
