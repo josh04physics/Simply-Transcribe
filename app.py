@@ -24,7 +24,7 @@ load_dotenv()
 
 app = Flask(__name__, instance_relative_config=True)
 
-executor = ThreadPoolExecutor(max_workers=1)
+executor = ThreadPoolExecutor(max_workers=4)
 
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
@@ -132,10 +132,9 @@ def progress():
 
     def generate_progress():
         seen_ids = set()
-
         while True:
-            progress_entries = Progress.query.filter_by(filename=filename, phase=phase).order_by(Progress.id).all()
-            new_entries = [e for e in progress_entries if e.id not in seen_ids]
+            entries = Progress.query.filter_by(filename=filename, phase=phase).order_by(Progress.id).all()
+            new_entries = [e for e in entries if e.id not in seen_ids]
 
             for entry in new_entries:
                 seen_ids.add(entry.id)
@@ -143,11 +142,12 @@ def progress():
                 if entry.is_done:
                     yield "data: [DONE]\n\n"
                     return
+            time.sleep(1)
 
-            time.sleep(1)  # Wait 1 second before checking again
-
-    return Response(stream_with_context(generate_progress()), content_type="text/event-stream")
-
+    response = Response(stream_with_context(generate_progress()), content_type="text/event-stream")
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["X-Accel-Buffering"] = "no"  # Important for Render and Nginx
+    return response
 
 
 @app.route('/buy-credits', methods=['GET', 'POST'])
