@@ -418,7 +418,7 @@
     </div>
   </div>
 
-  <script>
+ <script>
   const fileInput = document.querySelector('input[name="audio_file"]');
   const costEstimate = document.getElementById('cost-estimate');
   const outputCheckboxes = document.querySelectorAll('input[name="outputs"]');
@@ -433,18 +433,11 @@
     const sizeInMB = file.size / (1024 * 1024);
     const estimatedMinutes = Math.max(1, Math.ceil(sizeInMB));
 
-    let totalCredits = 0;
-    let details = [];
+    const selectedOutputs = [...outputCheckboxes].filter(cb => cb.checked);
+    const numOutputs = selectedOutputs.length;
 
-    [...outputCheckboxes].forEach(cb => {
-      if (cb.checked) {
-        const isLatex = cb.value === 'latex';
-        const costPerMinute = isLatex ? 2 : 1;
-        const credits = estimatedMinutes * costPerMinute;
-        totalCredits += credits;
-        details.push(`${costPerMinute}×${estimatedMinutes} for ${cb.value}`);
-      }
-    });
+    const totalCredits = estimatedMinutes * numOutputs;
+    const details = selectedOutputs.map(cb => `${estimatedMinutes} min for ${cb.value}`);
 
     costEstimate.textContent =
       `Estimated credit cost: ${totalCredits} credit${totalCredits !== 1 ? 's' : ''} ` +
@@ -453,8 +446,7 @@
 
   fileInput.addEventListener('change', updateCostEstimate);
   outputCheckboxes.forEach(cb => cb.addEventListener('change', updateCostEstimate));
-
-  // Removed the form submit event listener with EventSource for progress callback
 </script>
+
 </body>
 </html>

@@ -60,30 +60,6 @@ with app.app_context():
     if database_url.startswith("sqlite:///") and not os.path.exists(db_path):
         db.create_all()
 
-    '''
-    # TEMP
-    Progress.query.filter_by(filename="investments").delete()
-    db.session.commit()
-    result = Results.query.filter_by(filename="investments").first()
-
-
-
-
-    # Delete result entry
-    db.session.delete(result)
-    db.session.commit()
-
-    Progress.query.filter_by(filename="eencyweencyspider").delete()
-    db.session.commit()
-    result = Results.query.filter_by(filename="eencyweencyspider").first()
-
-    # Delete result entry
-    db.session.delete(result)
-    db.session.commit()
-
-    '''
-
-
 
 
 def set_ffmpeg_path():
@@ -350,16 +326,22 @@ def upload_file():
     try:
         audio = AudioSegment.from_file(audio_path)
         duration_minutes = max(1, -(-len(audio) // 60000))
+        num_outputs = len(outputs)
+        total_credits_needed = duration_minutes * num_outputs
     except Exception as e:
         flash(f"Failed to read audio: {e}", "danger")
         return redirect(url_for('index'))
 
-    if current_user.credits < duration_minutes:
+    if current_user.credits < total_credits_needed:
         flash(f"You need {duration_minutes} credits, but have {current_user.credits}.", "warning")
         return redirect(url_for('index'))
 
-    current_user.credits -= duration_minutes
+    current_user.credits -= total_credits_needed
     db.session.commit()
+
+    flash(f"{total_credits_needed} credits deducted "
+          f"({duration_minutes} min × {num_outputs} outputs). "
+          f"You have {current_user.credits} remaining.", "success")
 
     base_filename = os.path.splitext(file.filename)[0]
 
