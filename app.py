@@ -4,6 +4,8 @@ from flask_migrate import Migrate
 import os
 from models import db
 from models.user import User
+from models.progress import Progress
+from models.results import Results
 from forms.forms import RegisterForm, LoginForm
 from flask_bcrypt import Bcrypt
 import sys
@@ -14,7 +16,8 @@ import stripe
 from concurrent.futures import ThreadPoolExecutor
 import threading
 from tasks import background_process_file, background_generate_outputs
-from utils import results_cache, progress_queues
+import io
+import time
 
 load_dotenv()
 
@@ -57,6 +60,31 @@ with app.app_context():
     if database_url.startswith("sqlite:///") and not os.path.exists(db_path):
         db.create_all()
 
+    '''
+    # TEMP
+    Progress.query.filter_by(filename="investments").delete()
+    db.session.commit()
+    result = Results.query.filter_by(filename="investments").first()
+
+
+
+
+    # Delete result entry
+    db.session.delete(result)
+    db.session.commit()
+
+    Progress.query.filter_by(filename="eencyweencyspider").delete()
+    db.session.commit()
+    result = Results.query.filter_by(filename="eencyweencyspider").first()
+
+    # Delete result entry
+    db.session.delete(result)
+    db.session.commit()
+
+    '''
+
+
+
 
 def set_ffmpeg_path():
     # Detect OS platform
@@ -93,22 +121,35 @@ bcrypt = Bcrypt(app)
 migrate = Migrate(app, db) # To allow columns to be added using terminal
 
 
+# app.py
 @app.route("/progress")
 def progress():
     filename = request.args.get("filename")
-    q = progress_queues.get(filename)
+    phase = request.args.get("phase", "phase1")
 
-    def generate():
-        if not q:
-            yield f"data: Waiting for progress...\n\n"
-            return
+    if not filename:
+        return jsonify({"error": "Missing filename"}), 400
+
+    def generate_progress():
+        seen_ids = set()
+
         while True:
-            message = q.get()
-            yield f"data: {message}\n\n"
-            if message == "[DONE]":
-                break
+            progress_entries = Progress.query.filter_by(filename=filename, phase=phase).order_by(Progress.id).all()
+            new_entries = [e for e in progress_entries if e.id not in seen_ids]
 
-    return Response(stream_with_context(generate()), content_type='text/event-stream')
+            for entry in new_entries:
+                seen_ids.add(entry.id)
+                yield f"data: {entry.message}\n\n"
+                if entry.is_done:
+                    yield "data: [DONE]\n\n"
+                    return
+
+            time.sleep(1)  # Wait 1 second before checking again
+
+    return Response(stream_with_context(generate_progress()), content_type="text/event-stream")
+
+
+
 @app.route('/buy-credits', methods=['GET', 'POST'])
 @login_required
 def buy_credits(): # For specifying amount (confusing name, change later??)
@@ -329,21 +370,21 @@ def upload_file():
     return render_template("processing.html", filename=base_filename)
 
 
+# app.py
 @app.route('/check_results/<filename>')
 @login_required
 def check_results(filename):
-    result = results_cache.get(filename)
+    result = Results.query.filter_by(filename=filename).first()
     if result:
         return render_template(
             "edit_outputs.html",
-            formatted_transcript=result["transcript"],
-            summary=result["summary"],
+            formatted_transcript=result.transcript,
+            summary=result.summary,
             filename=filename,
-            selected_outputs=result["outputs"]
+            selected_outputs=result.outputs
         )
     else:
         return "", 202  # Not ready yet
-
 
 @app.route('/finalize', methods=['POST'])
 @login_required
@@ -373,32 +414,47 @@ def processing_final():
     filename = request.args.get("filename")
     return render_template("processing_final.html", filename=filename)
 
+
 @app.route("/download_ready/<filename>")
 @login_required
 def download_ready(filename):
-    result = results_cache.get(filename)
-    if result and result.get("zip_ready"):
+    result = Results.query.filter_by(filename=filename).first()
+    if result and result.zip_ready:
         return "", 200
     return "", 202
 
 
+# app.py
+# Python
 @app.route('/download_zip/<filename>')
 @login_required
 def download_zip(filename):
-    result = results_cache.get(filename)
-    if not result or not result.get("zip_ready"):
-        return "Still processing. Please wait.", 202
+    result = Results.query.filter_by(filename=filename).first()
+    if not result or not result.zip_ready:
+        return jsonify({"error": "ZIP file not ready"}), 202
 
-    memory_file = result.get("zip_data")
-    if not memory_file:
-        return "ZIP not found", 404
+    memory_file = io.BytesIO(result.zip_data)
     memory_file.seek(0)
-    return send_file(
+
+    # Serve the ZIP file
+    response = send_file(
         memory_file,
         mimetype='application/zip',
         as_attachment=True,
         download_name=f"{filename}_outputs.zip"
     )
+
+    # Remove data from the database after serving the file
+    try:
+        Progress.query.filter_by(filename=filename, phase="phase1").delete()
+        Progress.query.filter_by(filename=filename, phase="phase2").delete()
+        db.session.delete(result)  # ✅ Delete the result entry
+
+        db.session.commit()
+    except Exception as e:
+        print(f"Error deleting database entries: {e}")
+
+    return response
 
 @app.route("/success")
 @login_required

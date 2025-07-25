@@ -65,7 +65,8 @@
         const progressDiv = document.getElementById('progress-messages');
 
         // Open SSE connection to listen for progress updates
-        const eventSource = new EventSource(`/progress?filename=${encodeURIComponent(filename)}`);
+        const eventSource = new EventSource(`/progress?filename=${encodeURIComponent(filename)}&phase=phase1`);
+
 
 
         eventSource.onmessage = function(event) {

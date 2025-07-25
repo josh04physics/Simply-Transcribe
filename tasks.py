@@ -1,9 +1,6 @@
 import os
-from flask import current_app
 import io
 import zipfile
-from queue import Queue
-from utils import progress_queues, results_cache
 from pdfgeneration import (
     generate_pdf_from_text,
     generate_word_doc_from_text,
@@ -12,58 +9,59 @@ from pdfgeneration import (
     summarise_text_from_transcript,
     transcribe_audio
 )
-
+from models.progress import Progress
+from models.results import Results
+from models import db
+def log_progress(filename, message, is_done=False, phase="phase1"):
+    progress = Progress(filename=filename, message=message, is_done=is_done, phase=phase)
+    db.session.add(progress)
+    db.session.commit()
 
 def background_process_file(app, audio_path, filename, outputs):
-    # Get existing queue or create new
-    q = progress_queues.setdefault(filename, Queue())
-
-    def log(msg):
-        q.put(msg)
-
     try:
         with app.app_context():
-            log("Transcribing audio...")
+            log_progress(filename, "Transcribing audio...", phase="phase1")
             transcript = transcribe_audio(audio_path)
 
             formatted_transcript = None
             summary = None
 
             if 'transcript' in outputs or 'latex' in outputs:
-                log("Generating formatted transcript...")
+                log_progress(filename, "Generating formatted transcript...", phase="phase1")
                 formatted_transcript = format_transcription(transcript)
-
+                print("Formatted transcript generated successfully.")
             if 'summary' in outputs:
-                log("Generating summary...")
+                log_progress(filename, "Generating summary...", phase="phase1")
                 summary = summarise_text_from_transcript(transcript)
+                print("Summary generated successfully.")
 
-            log("Storing results...")
-            # Store result in memory so check_results can return it
-            results_cache[filename] = {
-                "transcript": formatted_transcript,
-                "summary": summary,
-                "outputs": outputs
-            }
+            log_progress(filename, "Storing results...", phase="phase1")
+            result = Results(
+                filename=filename,
+                transcript=formatted_transcript,
+                summary=summary,
+                outputs=outputs,
+                zip_ready=False
+            )
+            db.session.add(result)
+            db.session.commit()
+
+
+            log_progress(filename, "[DONE]", is_done=True, phase="phase1")
     except Exception as e:
-        log(f"❌ Error during processing: {str(e)}")
-    finally:
-        # Signal to frontend that processing is done
-        log("[DONE]")
+        print(f"Error processing file {filename}: {e}")
 
-
+# Python
 def background_generate_outputs(app, transcript, summary, filename, outputs):
-    q = progress_queues.setdefault(filename, Queue())
-
-    def log(msg):
-        q.put(msg)
-
     try:
         with app.app_context():
+            log_progress(filename, "Starting output generation...", phase="phase2")
+
             output_files = []
 
             if transcript:
                 if 'transcript' in outputs:
-                    log("Generating final transcript PDF...")
+                    log_progress(filename, "Generating transcript PDFs and DOCX...", phase="phase2")
                     paragraphs = [p.strip() for p in transcript.split("\n") if p.strip()]
                     pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-transcript.pdf")
                     docx_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-transcript.docx")
@@ -71,21 +69,19 @@ def background_generate_outputs(app, transcript, summary, filename, outputs):
                     generate_word_doc_from_text("Transcript", paragraphs, docx_path)
                     output_files.append((pdf_path, "edited-transcript.pdf"))
                     output_files.append((docx_path, "edited-transcript.docx"))
-                    log("Final Transcript PDF Generated")
+                    print("Transcript generated successfully.")
 
                 if 'latex' in outputs:
-                    log("Generating LaTeX file...")
+                    log_progress(filename, "Generating LaTeX PDF...", phase="phase2")
                     latex_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-transcript-latex.pdf")
-                    log("LaTeX file generated")
-                    log("Generating PDF from LaTeX...")
                     generate_latex_pdf_from_transcipt(transcript, latex_path)
                     output_files.append((latex_path, "edited-transcript-latex.pdf"))
                     tex_path = os.path.join(app.config['UPLOAD_FOLDER'], f"Math_Transcription.tex")
                     output_files.append((tex_path, "edited-transcript-latex.tex"))
-                    log("LaTeX PDF Generated")
+                    print("Latex PDF generated successfully.")
 
             if summary:
-                log("Generating final summary PDF...")
+                log_progress(filename, "Generating summary PDFs and DOCX...", phase="phase2")
                 summary_paragraphs = [p.strip() for p in summary.split("\n") if p.strip()]
                 pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-summary.pdf")
                 docx_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-summary.docx")
@@ -93,10 +89,10 @@ def background_generate_outputs(app, transcript, summary, filename, outputs):
                 generate_word_doc_from_text("Summary", summary_paragraphs, docx_path)
                 output_files.append((pdf_path, "edited-summary.pdf"))
                 output_files.append((docx_path, "edited-summary.docx"))
-                log("Final summary PDF generated")
+                print("Summary generated successfully.")
 
+            log_progress(filename, "Creating ZIP file...", phase="phase2")
             # Create ZIP in memory
-            log("Nearly done! Generating ZIP file...")
             memory_file = io.BytesIO()
             with zipfile.ZipFile(memory_file, 'w') as zf:
                 for path, arcname in output_files:
@@ -106,17 +102,13 @@ def background_generate_outputs(app, transcript, summary, filename, outputs):
                         print(f"Warning: file {path} does not exist!")
             memory_file.seek(0)
 
-            # Update results_cache entry, preserving existing data if present
-            existing = results_cache.get(filename, {})
-            existing.update({
-                "zip_ready": True,
-                "zip_data": memory_file
-            })
-            results_cache[filename] = existing
-
-            log("ZIP file for outputs generated and cached.")
+            # Update the database entry for the result
+            log_progress(filename, "Updating database with ZIP file...", phase="phase2")
+            result = Results.query.filter_by(filename=filename).first()
+            if result:
+                result.zip_ready = True
+                result.zip_data = memory_file.getvalue()  # Store ZIP data as binary
+                db.session.commit()
+                log_progress(filename, "[DONE]", is_done=True, phase="phase2")  # Mark progress as done
     except Exception as e:
-        log(f"❌ Error during output generation: {str(e)}")
-    finally:
-        # Signal to frontend that output generation is done
-        log("[DONE]")
+        log_progress(filename, f"❌ Error during output generation: {str(e)}", is_done=True)

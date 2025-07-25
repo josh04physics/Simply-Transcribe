@@ -66,69 +66,69 @@
 
   <script>
     const filename = "{{ filename }}";
-    const progressBox = document.getElementById("progress");
+const progressBox = document.getElementById("progress");
 
-    const eventSource = new EventSource(`/progress?filename=${encodeURIComponent(filename)}`);
+// Use phase=phase2 for final output generation
+const eventSource = new EventSource(`/progress?filename=${encodeURIComponent(filename)}&phase=phase2`);
 
+eventSource.onmessage = function(event) {
+  if (event.data === "[DONE]") {
+    progressBox.textContent += "\n✅ Files ready. Downloading...";
+    eventSource.close();
 
-    eventSource.onmessage = function(event) {
-      if (event.data === "[DONE]") {
-        progressBox.textContent += "\n✅ Files ready. Downloading...";
-        eventSource.close();
+    const link = document.createElement("a");
+    link.href = `/download_zip/${filename}`;
+    link.download = `${filename}_outputs.zip`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
 
-        const link = document.createElement("a");
-        link.href = `/download_zip/${filename}`;
-        link.download = `${filename}_outputs.zip`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-
-        setTimeout(() => {
-          window.location.href = "/success";
-        }, 2000);
-      } else {
-        if(progressBox.textContent === "Waiting for files to be ready...") {
-          progressBox.textContent = ""; // Clear placeholder on first update
-        }
-        progressBox.textContent += "\n" + event.data;
-        progressBox.scrollTop = progressBox.scrollHeight;
-      }
-    };
-
-    eventSource.onerror = function() {
-      progressBox.textContent += "\n❌ Connection lost. Trying fallback polling...";
-      eventSource.close();
-      startPolling();
-    };
-
-    async function poll() {
-      try {
-        const res = await fetch(`/download_ready/${filename}`);
-        if (res.status === 200) {
-          progressBox.textContent += "\n✅ Files ready. Downloading...";
-
-          const link = document.createElement("a");
-          link.href = `/download_zip/${filename}`;
-          link.download = `${filename}_outputs.zip`;
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-
-          setTimeout(() => {
-            window.location.href = "/success";
-          }, 2000);
-        } else {
-          setTimeout(poll, 3000);
-        }
-      } catch (err) {
-        progressBox.textContent += `\n❌ Error: ${err.message}`;
-        setTimeout(poll, 5000);
-      }
+    setTimeout(() => {
+      window.location.href = "/success";
+    }, 2000);
+  } else {
+    if(progressBox.textContent === "Waiting for files to be ready...") {
+      progressBox.textContent = ""; // Clear placeholder on first update
     }
+    progressBox.textContent += "\n" + event.data;
+    progressBox.scrollTop = progressBox.scrollHeight;
+  }
+};
 
-    function startPolling() {
-      poll();
+eventSource.onerror = function() {
+  progressBox.textContent += "\n❌ Connection lost. Trying fallback polling...";
+  eventSource.close();
+  startPolling();
+};
+
+async function poll() {
+  try {
+    const res = await fetch(`/download_ready/${filename}`);
+    if (res.status === 200) {
+      progressBox.textContent += "\n✅ Files ready. Downloading...";
+
+      const link = document.createElement("a");
+      link.href = `/download_zip/${filename}`;
+      link.download = `${filename}_outputs.zip`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      setTimeout(() => {
+        window.location.href = "/success";
+      }, 2000);
+    } else {
+      setTimeout(poll, 3000);
     }
+  } catch (err) {
+    progressBox.textContent += `\n❌ Error: ${err.message}`;
+    setTimeout(poll, 5000);
+  }
+}
+
+function startPolling() {
+  poll();
+}
   </script>
 </body>
 </html>
