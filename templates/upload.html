@@ -455,6 +455,9 @@ button[type="submit"]:hover {
     <p id="cost-estimate" style="font-size: 0.95em; color: #444; margin-bottom: 16px;"></p>
 
     <button type="submit">Generate and edit files</button>
+    <p id="upload-status" style="display: none; font-weight: bold; color: #333; margin-top: 16px;">
+  📤 Uploading file... Please wait.
+</p>
   </form>
 
     <div id="loading">
@@ -579,6 +582,8 @@ button[type="submit"]:hover {
   const fileInput = document.querySelector('input[name="audio_file"]');
   const costEstimate = document.getElementById('cost-estimate');
   const outputCheckboxes = document.querySelectorAll('input[name="outputs"]');
+  const form = document.getElementById('upload-form');
+  const uploadStatus = document.getElementById('upload-status');
 
   function updateCostEstimate() {
     const file = fileInput.files[0];
@@ -603,6 +608,10 @@ button[type="submit"]:hover {
 
   fileInput.addEventListener('change', updateCostEstimate);
   outputCheckboxes.forEach(cb => cb.addEventListener('change', updateCostEstimate));
+
+   form.addEventListener('submit', function () {
+    uploadStatus.style.display = 'block';
+  });
 
      const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
