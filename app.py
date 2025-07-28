@@ -18,6 +18,8 @@ import threading
 from tasks import background_process_file, background_generate_outputs, download_youtube_audio
 import io
 import time
+import uuid
+import subprocess
 
 
 load_dotenv()
@@ -363,6 +365,7 @@ def upload_file():
 def upload_youtube_link():
     youtube_url = request.form.get("youtube_url")
     outputs = request.form.getlist('outputs')
+    cookies_file = request.files.get('cookies')  # Optional cookies file
 
     if not outputs:
         flash("Please select at least one output type.", "warning")
@@ -372,26 +375,51 @@ def upload_youtube_link():
         flash("YouTube URL is required.", "danger")
         return redirect(url_for('index'))
 
-    # Step 1: Download YouTube audio
-    audio_path = download_youtube_audio(youtube_url, app.config["UPLOAD_FOLDER"])
-    if not audio_path:
-        flash("Failed to download audio from YouTube.", "danger")
-        return redirect(url_for('index'))
+    # Generate unique output file path in /tmp (safe for Render)
+    filename_id = uuid.uuid4().hex
+    audio_path = os.path.join("/tmp", f"audio_{filename_id}.mp3")
 
-    # Step 2: Deduct credits based on duration and number of outputs
+    # Handle optional cookies upload
+    cookies_path = None
+    if cookies_file:
+        cookies_path = os.path.join("/tmp", f"cookies_{uuid.uuid4().hex}.txt")
+        cookies_file.save(cookies_path)
+
+    # Construct yt-dlp command
+    cmd = [
+        'yt-dlp',
+        youtube_url,
+        '-x',
+        '--audio-format', 'mp3',
+        '-o', audio_path
+    ]
+    if cookies_path:
+        cmd += ['--cookies', cookies_path]
+
     try:
+        subprocess.run(cmd, check=True)
+
+        # Step 2: Deduct credits based on duration and number of outputs
         success, message = calculate_and_deduct_credits(audio_path, outputs)
         if not success:
-            os.remove(audio_path)  # clean up the downloaded file
+            os.remove(audio_path)
             flash(message, "warning")
             return redirect(url_for('index'))
         flash(message, "success")
+
+    except subprocess.CalledProcessError as e:
+        flash("Failed to download audio from YouTube. Authentication may be required.", "danger")
+        return redirect(url_for('index'))
     except Exception as e:
-        os.remove(audio_path)
+        if os.path.exists(audio_path):
+            os.remove(audio_path)
         flash(f"Failed to process audio: {e}", "danger")
         return redirect(url_for('index'))
+    finally:
+        if cookies_path and os.path.exists(cookies_path):
+            os.remove(cookies_path)
 
-    # Step 3: Extract filename and run background processing
+    # Step 3: Start background thread to process audio
     filename = os.path.splitext(os.path.basename(audio_path))[0]
     thread = threading.Thread(target=background_process_file, args=(app, audio_path, filename, outputs))
     thread.start()
