@@ -432,39 +432,71 @@ button[type="submit"]:hover {
   </div>
 
 <form id="upload-form" method="POST" action="/upload" enctype="multipart/form-data">
+  <h2>Upload Audio File</h2>
+
   <input type="file" name="audio_file" accept=".mp3, audio/mpeg, audio/mp4, audio/wav, audio/x-wav, audio/*" required>
 
-    <div class="checkbox-group" style="margin: 20px 0;">
-      <label class="custom-checkbox">
-        <input type="checkbox" name="outputs" value="transcript" checked>
-        <span class="checkmark"></span>
-        Transcript (pdf and docx)
-      </label>
-      <label class="custom-checkbox">
-        <input type="checkbox" name="outputs" value="summary" checked>
-        <span class="checkmark"></span>
-        Summary (pdf and docx)
-      </label>
-      <label class="custom-checkbox">
-        <input type="checkbox" name="outputs" value="latex" checked>
-        <span class="checkmark"></span>
-        LaTeX Transcript [Professional] (TeX and pdf)
-      </label>
-    </div>
-
-    <p id="cost-estimate" style="font-size: 0.95em; color: #444; margin-bottom: 16px;"></p>
-
-    <button type="submit">Generate and edit files</button>
-    <p id="upload-status" style="display: none; font-weight: bold; color: #333; margin-top: 16px;">
-  📤 Uploading file... Please wait.
-</p>
-  </form>
-
-    <div id="loading">
-      <div id="progress-messages">Generating PDF, please wait...</div>
-    </div>
+  <div class="checkbox-group" style="margin: 20px 0;">
+    <label class="custom-checkbox">
+      <input type="checkbox" name="outputs" value="transcript" checked>
+      <span class="checkmark"></span>
+      Transcript (pdf and docx)
+    </label>
+    <label class="custom-checkbox">
+      <input type="checkbox" name="outputs" value="summary" checked>
+      <span class="checkmark"></span>
+      Summary (pdf and docx)
+    </label>
+    <label class="custom-checkbox">
+      <input type="checkbox" name="outputs" value="latex" checked>
+      <span class="checkmark"></span>
+      LaTeX Transcript [Professional] (TeX and pdf)
+    </label>
   </div>
 
+  <p id="cost-estimate" style="font-size: 0.95em; color: #444; margin-bottom: 16px;"></p>
+
+  <button type="submit">Generate and edit files from upload</button>
+  <p id="upload-status" style="display: none; font-weight: bold; color: #333; margin-top: 16px;">
+    📤 Uploading file... Please wait.
+  </p>
+</form>
+
+<hr style="margin: 40px 0;">
+
+<form id="link-form" method="POST" action="/upload_link">
+  <h2>Or Paste a YouTube Link</h2>
+
+  <input type="url" name="youtube_url" placeholder="https://www.youtube.com/watch?v=..." required
+         style="width: 100%; max-width: 500px; padding: 8px; margin-bottom: 20px;">
+
+  <div class="checkbox-group" style="margin: 20px 0;">
+    <label class="custom-checkbox">
+      <input type="checkbox" name="outputs" value="transcript" checked>
+      <span class="checkmark"></span>
+      Transcript (pdf and docx)
+    </label>
+    <label class="custom-checkbox">
+      <input type="checkbox" name="outputs" value="summary" checked>
+      <span class="checkmark"></span>
+      Summary (pdf and docx)
+    </label>
+    <label class="custom-checkbox">
+      <input type="checkbox" name="outputs" value="latex" checked>
+      <span class="checkmark"></span>
+      LaTeX Transcript [Professional] (TeX and pdf)
+    </label>
+  </div>
+
+  <p id="link-cost-estimate" style="font-size: 0.95em; color: #444; margin-bottom: 16px;"></p>
+
+  <button type="submit">Generate and edit files from link</button>
+  <p id="link-upload-status" style="display: none; font-weight: bold; color: #333; margin-top: 16px;">
+    ⏳ Processing YouTube link... Please wait.
+  </p>
+</form>
+
+</div>
 <div>
   <!-- FEATURES SECTION -->
   <section id="features" style="padding: 2rem 0;">
@@ -578,14 +610,27 @@ button[type="submit"]:hover {
 
 
 
- <script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // --- Audio Upload Form Elements ---
   const fileInput = document.querySelector('input[name="audio_file"]');
   const costEstimate = document.getElementById('cost-estimate');
   const outputCheckboxes = document.querySelectorAll('input[name="outputs"]');
   const form = document.getElementById('upload-form');
   const uploadStatus = document.getElementById('upload-status');
 
+  // --- YouTube Link Form Elements ---
+  const youtubeForm = document.getElementById('link-form');
+  const linkUploadStatus = document.getElementById('link-upload-status');
+  const youtubeSubmitBtn = youtubeForm ? youtubeForm.querySelector('button[type="submit"]') : null;
+  const linkCostEstimate = youtubeForm ? document.getElementById('link-cost-estimate') : null;  // Make sure this exists in your HTML!
+  const linkOutputCheckboxes = youtubeForm ? youtubeForm.querySelectorAll('input[name="outputs"]') : [];
+  const youtubeUrlInput = youtubeForm ? youtubeForm.querySelector('input[name="youtube_url"]') : null;
+
+  // --- Function to update audio upload cost estimate ---
   function updateCostEstimate() {
+    if (!fileInput || !costEstimate) return;
+
     const file = fileInput.files[0];
     if (!file) {
       costEstimate.textContent = '';
@@ -595,25 +640,74 @@ button[type="submit"]:hover {
     const sizeInMB = file.size / (1024 * 1024);
     const estimatedMinutes = Math.max(1, Math.ceil(sizeInMB));
 
+    // Remove duplicates just in case
     const selectedOutputs = [...outputCheckboxes].filter(cb => cb.checked);
-    const numOutputs = selectedOutputs.length;
+    const uniqueOutputs = [...new Set(selectedOutputs.map(cb => cb.value))];
+    const numOutputs = uniqueOutputs.length;
 
     const totalCredits = estimatedMinutes * numOutputs;
-    const details = selectedOutputs.map(cb => `${estimatedMinutes} min for ${cb.value}`);
+    const details = uniqueOutputs.map(value => `${estimatedMinutes} min for ${value}`);
 
     costEstimate.textContent =
       `Estimated credit cost: ${totalCredits} credit${totalCredits !== 1 ? 's' : ''} ` +
       `(${details.join(', ')})`;
   }
 
-  fileInput.addEventListener('change', updateCostEstimate);
-  outputCheckboxes.forEach(cb => cb.addEventListener('change', updateCostEstimate));
+  // --- Function to update YouTube link cost estimate ---
+  function updateLinkCostEstimate() {
+    if (!youtubeUrlInput || !linkCostEstimate) return;
 
-   form.addEventListener('submit', function () {
-    uploadStatus.style.display = 'block';
-  });
+    const urlValue = youtubeUrlInput.value.trim();
+    if (!urlValue) {
+      linkCostEstimate.textContent = '';
+      return;
+    }
 
-     const observer = new IntersectionObserver((entries) => {
+    const selectedOutputs = [...linkOutputCheckboxes].filter(cb => cb.checked);
+    const numOutputs = selectedOutputs.length;
+
+    if (numOutputs === 0) {
+      linkCostEstimate.textContent = '';
+      return;
+    }
+
+    linkCostEstimate.textContent =
+      `Estimated credit cost: ${numOutputs} time${numOutputs !== 1 ? 's' : ''} the length of the video in minutes`;
+  }
+
+  // --- Event listeners for audio upload form ---
+  if (fileInput && outputCheckboxes.length > 0) {
+    fileInput.addEventListener('change', updateCostEstimate);
+    outputCheckboxes.forEach(cb => cb.addEventListener('change', updateCostEstimate));
+  }
+
+  if (form) {
+    form.addEventListener('submit', () => {
+      if (uploadStatus) uploadStatus.style.display = 'block';
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+    });
+  }
+
+  // --- Event listeners for YouTube link form ---
+  if (youtubeForm && linkUploadStatus && youtubeSubmitBtn) {
+    youtubeForm.addEventListener('submit', () => {
+      youtubeSubmitBtn.disabled = true;
+      linkUploadStatus.style.display = 'block';
+    });
+  }
+
+  if (youtubeUrlInput && linkOutputCheckboxes.length > 0) {
+    youtubeUrlInput.addEventListener('input', updateLinkCostEstimate);
+    linkOutputCheckboxes.forEach(cb => cb.addEventListener('change', updateLinkCostEstimate));
+  }
+
+  // --- Initialize cost estimates on page load ---
+  updateCostEstimate();
+  updateLinkCostEstimate();
+
+  // --- IntersectionObserver for fade-in effects ---
+  const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
         entry.target.classList.add("visible");
@@ -624,7 +718,7 @@ button[type="submit"]:hover {
   document.querySelectorAll(".fade-in").forEach(el => {
     observer.observe(el);
   });
-
+});
 
 </script>
 

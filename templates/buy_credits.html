@@ -175,15 +175,18 @@
     </div>
 
     <ul class="flashes">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    {% if "logged out" not in message.lower() and "please log in" not in message.lower() %}
-                        <li class="flash">{{ message }}</li>
-                    {% endif %}
-                {% endfor %}
+            {% with messages = get_flashed_messages(with_categories=true) %}
+             {% if messages %}
+        {% for category, message in messages %}
+            {% if message is string and
+                  "logged out" not in message.lower() and
+                  "please log in" not in message.lower() %}
+                <li class="flash">{{ message }}</li>
             {% endif %}
-        {% endwith %}
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
     </ul>
 </div>
 

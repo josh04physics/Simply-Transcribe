@@ -12,6 +12,10 @@ from pdfgeneration import (
 from models.progress import Progress
 from models.results import Results
 from models import db
+
+import yt_dlp
+import uuid
+
 def log_progress(filename, message, is_done=False, phase="phase1"):
     progress = Progress(filename=filename, message=message, is_done=is_done, phase=phase)
     db.session.add(progress)
@@ -112,3 +116,34 @@ def background_generate_outputs(app, transcript, summary, filename, outputs):
                 log_progress(filename, "[DONE]", is_done=True, phase="phase2")  # Mark progress as done
     except Exception as e:
         log_progress(filename, f"❌ Error during output generation: {str(e)}", is_done=True)
+
+def download_youtube_audio(youtube_url, upload_folder):
+    try:
+        temp_id = str(uuid.uuid4())
+        base_path = os.path.join(upload_folder, temp_id)  # no extension here
+
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': base_path,  # no .mp3 extension here
+            'quiet': True,
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([youtube_url])
+
+        # The postprocessor will save file as base_path + ".mp3"
+        final_path = base_path + ".mp3"
+
+        if os.path.exists(final_path):
+            return final_path
+        else:
+            print(f"❌ Downloaded file not found: {final_path}")
+            return None
+
+    except Exception as e:
+        print(f"❌ Error downloading YouTube audio: {e}")
+        return None

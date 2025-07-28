@@ -15,9 +15,10 @@ from dotenv import load_dotenv
 import stripe
 from concurrent.futures import ThreadPoolExecutor
 import threading
-from tasks import background_process_file, background_generate_outputs
+from tasks import background_process_file, background_generate_outputs, download_youtube_audio
 import io
 import time
+
 
 load_dotenv()
 
@@ -95,7 +96,22 @@ login_manager.login_view = 'login'
 bcrypt = Bcrypt(app)
 
 migrate = Migrate(app, db) # To allow columns to be added using terminal
+def calculate_and_deduct_credits(audio_path, outputs):
+    try:
+        audio = AudioSegment.from_file(audio_path)
+        duration_minutes = max(1, -(-len(audio) // 60000))
+        num_outputs = len(outputs)
+        total_credits_needed = duration_minutes * num_outputs
+    except Exception as e:
+        raise ValueError(f"Failed to read audio: {e}")
 
+    if current_user.credits < total_credits_needed:
+        raise PermissionError(f"You need {total_credits_needed} credits, "
+                              f"but have {current_user.credits}.")
+
+    current_user.credits -= total_credits_needed
+    db.session.commit()
+    return total_credits_needed, duration_minutes
 
 # app.py
 @app.route("/progress")
@@ -142,7 +158,6 @@ def buy_credits(): # For specifying amount (confusing name, change later??)
             return redirect(url_for('buy_credits'))
 
         price_per_credit_cents = 3
-        amount_to_charge = credits_to_buy * price_per_credit_cents
 
         session = stripe.checkout.Session.create(
             payment_method_types=['card'],
@@ -324,23 +339,16 @@ def upload_file():
     file.save(audio_path)
 
     try:
-        audio = AudioSegment.from_file(audio_path)
-        duration_minutes = max(1, -(-len(audio) // 60000))
-        num_outputs = len(outputs)
-        total_credits_needed = duration_minutes * num_outputs
-    except Exception as e:
-        flash(f"Failed to read audio: {e}", "danger")
+        total_credits_needed, duration_minutes = calculate_and_deduct_credits(audio_path, outputs)
+    except ValueError as e:
+        flash(str(e), "danger")
         return redirect(url_for('index'))
-
-    if current_user.credits < total_credits_needed:
-        flash(f"You need {duration_minutes} credits, but have {current_user.credits}.", "warning")
+    except PermissionError as e:
+        flash(str(e), "warning")
         return redirect(url_for('index'))
-
-    current_user.credits -= total_credits_needed
-    db.session.commit()
 
     flash(f"{total_credits_needed} credits deducted "
-          f"({duration_minutes} min × {num_outputs} outputs). "
+          f"({duration_minutes} min × {len(outputs)} outputs). "
           f"You have {current_user.credits} remaining.", "success")
 
     base_filename = os.path.splitext(file.filename)[0]
@@ -350,6 +358,46 @@ def upload_file():
     thread.start()
 
     return render_template("processing.html", filename=base_filename)
+@app.route('/upload_link', methods=['POST'])
+@login_required
+def upload_youtube_link():
+    youtube_url = request.form.get("youtube_url")
+    outputs = request.form.getlist('outputs')
+
+    if not outputs:
+        flash("Please select at least one output type.", "warning")
+        return redirect(url_for('index'))
+
+    if not youtube_url:
+        flash("YouTube URL is required.", "danger")
+        return redirect(url_for('index'))
+
+    # Step 1: Download YouTube audio
+    audio_path = download_youtube_audio(youtube_url, app.config["UPLOAD_FOLDER"])
+    if not audio_path:
+        flash("Failed to download audio from YouTube.", "danger")
+        return redirect(url_for('index'))
+
+    # Step 2: Deduct credits based on duration and number of outputs
+    try:
+        success, message = calculate_and_deduct_credits(audio_path, outputs)
+        if not success:
+            os.remove(audio_path)  # clean up the downloaded file
+            flash(message, "warning")
+            return redirect(url_for('index'))
+        flash(message, "success")
+    except Exception as e:
+        os.remove(audio_path)
+        flash(f"Failed to process audio: {e}", "danger")
+        return redirect(url_for('index'))
+
+    # Step 3: Extract filename and run background processing
+    filename = os.path.splitext(os.path.basename(audio_path))[0]
+    thread = threading.Thread(target=background_process_file, args=(app, audio_path, filename, outputs))
+    thread.start()
+
+    return render_template('processing.html', filename=filename)
+
 
 
 # app.py
