@@ -431,8 +431,8 @@ button[type="submit"]:hover {
     {% endif %}
   </div>
 
-  <form id="upload-form" method="POST" action="/upload" enctype="multipart/form-data">
-    <input type="file" name="audio_file" accept="audio/*" required>
+<form id="upload-form" method="POST" action="/upload" enctype="multipart/form-data">
+  <input type="file" name="audio_file" accept=".mp3, audio/mpeg, audio/mp4, audio/wav, audio/x-wav, audio/*" required>
 
     <div class="checkbox-group" style="margin: 20px 0;">
       <label class="custom-checkbox">
