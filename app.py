@@ -20,7 +20,7 @@ import io
 import time
 import uuid
 import subprocess
-
+import logging
 
 load_dotenv()
 
@@ -366,7 +366,7 @@ def upload_youtube_link():
     youtube_url = request.form.get("youtube_url")
     outputs = request.form.getlist('outputs')
 
-    print("received url and outputs")
+    app.logger.debug("received url and outputs")
 
     if not outputs:
         flash("Please select at least one output type.", "warning")
@@ -388,7 +388,7 @@ def upload_youtube_link():
         "--audio-format", "mp3",
         "-o", output_path
     ]
-    print("Running yt-dlp command:", " ".join(cmd))
+    app.logger.debug("Running yt-dlp command:", " ".join(cmd))
 
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
@@ -410,8 +410,8 @@ def upload_youtube_link():
         return redirect(url_for('index'))
 
     except Exception as e:
-        print(e)
-        print("Error")
+        app.logger.debug(e)
+        app.logger.debug("Error")
         flash(f"Unexpected error: {e}", "danger")
         return redirect(url_for('index'))
 
