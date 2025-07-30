@@ -405,7 +405,7 @@ def upload_youtube_link():
         print("Download successful, audio path:", audio_path)
 
     except subprocess.CalledProcessError as e:
-        print("Error downloading video:", e)
+        print("Error downloading video:", e, e.stderr)
         stderr = e.stderr or ""
         if "This video is age restricted" in stderr or "Sign in to confirm your age" in stderr or "HTTP Error 403" in stderr:
             flash("This video is age-restricted, private, or unavailable without login. Please try another video.", "danger")
