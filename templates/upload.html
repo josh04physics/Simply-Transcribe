@@ -466,6 +466,9 @@ button[type="submit"]:hover {
 
 <form id="link-form" method="POST" action="/upload_link">
   <h2>Or Paste a YouTube Link</h2>
+  <div style="background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; padding: 12px; border-radius: 6px; margin-bottom: 20px;">
+    ⚠️ This feature is temporarily unavailable due to restrictions on YouTube link processing in our hosted environment. We’re working on a fix!
+  </div>
 
   <input type="url" name="youtube_url" placeholder="https://www.youtube.com/watch?v=..." required
          style="width: 100%; max-width: 500px; padding: 8px; margin-bottom: 20px;">
@@ -491,6 +494,8 @@ button[type="submit"]:hover {
   <p id="link-cost-estimate" style="font-size: 0.95em; color: #444; margin-bottom: 16px;"></p>
 
   <button type="submit">Generate and edit files from link</button>
+  <!-- ⚠️ Warning Message -->
+
   <p id="link-upload-status" style="display: none; font-weight: bold; color: #333; margin-top: 16px;">
     ⏳ Processing YouTube link... Please wait.
   </p>
