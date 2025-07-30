@@ -30,11 +30,11 @@ def background_process_file(app, audio_path, filename, outputs):
             formatted_transcript = None
             summary = None
 
-            if 'transcript' in outputs or 'latex' in outputs:
+            if 'transcript' in outputs or 'latex_transcript' in outputs:
                 log_progress(filename, "Generating formatted transcript...", phase="phase1")
                 formatted_transcript = format_transcription(transcript)
                 print("Formatted transcript generated successfully.")
-            if 'summary' in outputs:
+            if 'summary' in outputs or 'latex_summary' in outputs:
                 log_progress(filename, "Generating summary...", phase="phase1")
                 summary = summarise_text_from_transcript(transcript)
                 print("Summary generated successfully.")
@@ -75,7 +75,7 @@ def background_generate_outputs(app, transcript, summary, filename, outputs):
                     output_files.append((docx_path, "edited-transcript.docx"))
                     print("Transcript generated successfully.")
 
-                if 'latex' in outputs:
+                if 'latex_transcript' in outputs:
                     log_progress(filename, "Generating LaTeX PDF...", phase="phase2")
                     latex_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-transcript-latex.pdf")
                     generate_latex_pdf_from_transcipt(transcript, latex_path)
@@ -85,15 +85,28 @@ def background_generate_outputs(app, transcript, summary, filename, outputs):
                     print("Latex PDF generated successfully.")
 
             if summary:
-                log_progress(filename, "Generating summary PDFs and DOCX...", phase="phase2")
-                summary_paragraphs = [p.strip() for p in summary.split("\n") if p.strip()]
-                pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-summary.pdf")
-                docx_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-summary.docx")
-                generate_pdf_from_text("Summary", summary_paragraphs, pdf_path)
-                generate_word_doc_from_text("Summary", summary_paragraphs, docx_path)
-                output_files.append((pdf_path, "edited-summary.pdf"))
-                output_files.append((docx_path, "edited-summary.docx"))
-                print("Summary generated successfully.")
+
+                if 'summary' in outputs:
+                    log_progress(filename, "Generating summary PDFs and DOCX...", phase="phase2")
+                    summary_paragraphs = [p.strip() for p in summary.split("\n") if p.strip()]
+                    pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-summary.pdf")
+                    docx_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-summary.docx")
+                    generate_pdf_from_text("Summary", summary_paragraphs, pdf_path)
+                    generate_word_doc_from_text("Summary", summary_paragraphs, docx_path)
+                    output_files.append((pdf_path, "edited-summary.pdf"))
+                    output_files.append((docx_path, "edited-summary.docx"))
+                    print("Summary generated successfully.")
+                if 'latex_summary' in outputs:
+                    log_progress(filename, "Generating LaTeX summary PDF...", phase="phase2")
+                    latex_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-summary-latex.pdf")
+                    generate_latex_pdf_from_transcipt(summary, latex_path)
+                    output_files.append((latex_path, "edited-summary-latex.pdf"))
+                    tex_path = os.path.join(app.config['UPLOAD_FOLDER'], f"Math_Summary.tex")
+                    output_files.append((tex_path, "edited-summary-latex.tex"))
+                    print("Latex summary PDF generated successfully.")
+
+
+
 
             log_progress(filename, "Creating ZIP file...", phase="phase2")
             # Create ZIP in memory

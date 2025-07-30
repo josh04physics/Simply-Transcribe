@@ -321,6 +321,51 @@ def generate_latex_from_transcript(transcript_text, output_dir="uploads", tex_fi
     return tex_path
 
 
+def generate_latex_summary(transcript_text, output_dir="uploads", tex_filename="summary_body.tex "):
+    import os
+
+    os.makedirs(output_dir, exist_ok=True)
+    tex_path = os.path.join(output_dir, tex_filename)
+
+    chunks = chunk_text_by_tokens(transcript_text, max_tokens=20000)
+    latex_bodies = []
+
+    for i, chunk in enumerate(chunks):
+
+        response = client.chat.completions.create(
+            model="o4-mini-2025-04-16",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that converts transcripts to LaTeX summaries."},
+                {"role": "user",
+                 "content": f"Convert this into a summary in LaTeX body code. Escape all special characters where necessary. Do NOT include document preamble or \\begin{{document}}:\n\n{chunk}"}
+            ],
+            max_completion_tokens=40000
+        )
+
+        body = response.choices[0].message.content.strip()
+        if body.startswith("```"):
+            body = "\n".join(body.splitlines()[1:-1])
+
+        clean_body = clean_latex_unicode(body)
+        latex_bodies.append(clean_body)
+
+    final_tex = (
+            "\\documentclass{article}\n"
+            "\\usepackage[margin=1in]{geometry}\n"
+            "\\usepackage{amsmath, amssymb}\n"
+            "\\usepackage{enumitem}\n"
+            "\\usepackage{url}\n"
+            "\\begin{document}\n\n"
+            + "\n\n".join(latex_bodies)
+            + "\n\n\\end{document}"
+    )
+
+    with open(tex_path, "w", encoding="utf-8") as f:
+        f.write(final_tex)
+
+    return tex_path
+
+
 def clean_latex_unicode(text):
     """
     Replaces problematic Unicode characters in GPT output with LaTeX-safe equivalents.
@@ -512,9 +557,10 @@ def compile_latex_to_pdf(latex_file, pdf_path):
 
 
 
-
-
-
 def generate_latex_pdf_from_transcipt(transcript, pdf_path):
     latex_file = generate_latex_from_transcript(transcript, "uploads", "Math_Transcription.tex")
+    compile_latex_to_pdf(latex_file, pdf_path)
+
+def generate_latex_pdf_from_summary(transcript, pdf_path):
+    latex_file = generate_latex_from_transcript(transcript, "uploads", "Math_Summary.tex")
     compile_latex_to_pdf(latex_file, pdf_path)

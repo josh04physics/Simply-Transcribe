@@ -28,12 +28,12 @@
   </h2>
 
   <form id="finalize-form" style="max-width: 900px; margin: auto; font-family: sans-serif; color: #111;">
-    {% if 'transcript' in selected_outputs or 'latex' in selected_outputs %}
+    {% if 'transcript' in selected_outputs or 'latex_transcript' in selected_outputs %}
       <h2>Edit Transcript</h2>
       <textarea name="transcript" rows="20">{{ formatted_transcript | e }}</textarea>
     {% endif %}
 
-    {% if 'summary' in selected_outputs %}
+    {% if 'summary' in selected_outputs or 'latex_summary' in selected_outputs %}
       <h2 style="margin-top: 2rem;">Edit Summary</h2>
       <textarea name="summary" rows="10">{{ summary | e }}</textarea>
     {% endif %}
