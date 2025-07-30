@@ -366,6 +366,8 @@ def upload_youtube_link():
     youtube_url = request.form.get("youtube_url")
     outputs = request.form.getlist('outputs')
 
+    print("received url and outputs")
+
     if not outputs:
         flash("Please select at least one output type.", "warning")
         return redirect(url_for('index'))
@@ -386,6 +388,7 @@ def upload_youtube_link():
         "--audio-format", "mp3",
         "-o", output_path
     ]
+    print("Running yt-dlp command:", " ".join(cmd))
 
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
@@ -407,6 +410,8 @@ def upload_youtube_link():
         return redirect(url_for('index'))
 
     except Exception as e:
+        print(e)
+        print("Error")
         flash(f"Unexpected error: {e}", "danger")
         return redirect(url_for('index'))
 
