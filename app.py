@@ -374,33 +374,22 @@ def upload_youtube_link():
         flash("YouTube URL is required.", "danger")
         return redirect(url_for('index'))
 
-    #  Path to your cookies.txt file in Render deployment
-    cookies_path = os.path.join(app.root_path, 'static', 'private', 'cookies.txt')
-
-    if not os.path.exists(cookies_path):
-        flash("Server error: cookies file is missing.", "danger")
-        return redirect(url_for('index'))
-
-    #  Temporary path for the audio file
+    # Temporary path for the audio file
     unique_id = uuid.uuid4().hex
     output_path = os.path.join("/tmp", f"{unique_id}.%(ext)s")
 
-    #  Build yt-dlp command
+    # Build yt-dlp command (NO cookies)
     cmd = [
         "yt-dlp",
         youtube_url,
-        "--cookies", cookies_path,
         "-x",
         "--audio-format", "mp3",
         "-o", output_path
     ]
 
     try:
-        subprocess.run(cmd, check=True)
-
-        # Get actual mp3 path from output template
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
         audio_path = output_path.replace("%(ext)s", "mp3")
-
 
         success, message = calculate_and_deduct_credits(audio_path, outputs)
         if not success:
@@ -410,8 +399,13 @@ def upload_youtube_link():
         flash(message, "success")
 
     except subprocess.CalledProcessError as e:
-        flash("Download failed. The video may still require a more recent cookies file.", "danger")
+        stderr = e.stderr or ""
+        if "This video is age restricted" in stderr or "Sign in to confirm your age" in stderr or "HTTP Error 403" in stderr:
+            flash("This video is age-restricted, private, or unavailable without login. Please try another video.", "danger")
+        else:
+            flash("Download failed. Please make sure the link is valid and the video is public.", "danger")
         return redirect(url_for('index'))
+
     except Exception as e:
         flash(f"Unexpected error: {e}", "danger")
         return redirect(url_for('index'))
