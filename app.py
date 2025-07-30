@@ -363,10 +363,11 @@ def upload_file():
 @app.route('/upload_link', methods=['POST'])
 @login_required
 def upload_youtube_link():
+    print("upload youtube link called")
     youtube_url = request.form.get("youtube_url")
     outputs = request.form.getlist('outputs')
 
-    app.logger.debug("received url and outputs")
+    print("received url and outputs")
 
     if not outputs:
         flash("Please select at least one output type.", "warning")
@@ -388,7 +389,7 @@ def upload_youtube_link():
         "--audio-format", "mp3",
         "-o", output_path
     ]
-    app.logger.debug("Running yt-dlp command:", " ".join(cmd))
+    print("Running yt-dlp command:", " ".join(cmd))
 
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
@@ -398,8 +399,10 @@ def upload_youtube_link():
         if not success:
             os.remove(audio_path)
             flash(message, "warning")
+            print("Not enough credits, audio file removed.")
             return redirect(url_for('index'))
         flash(message, "success")
+        print("Download successful, audio path:", audio_path)
 
     except subprocess.CalledProcessError as e:
         stderr = e.stderr or ""
@@ -410,8 +413,8 @@ def upload_youtube_link():
         return redirect(url_for('index'))
 
     except Exception as e:
-        app.logger.debug(e)
-        app.logger.debug("Error")
+        print(e)
+        print("Error")
         flash(f"Unexpected error: {e}", "danger")
         return redirect(url_for('index'))
 
