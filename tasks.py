@@ -5,6 +5,7 @@ from pdfgeneration import (
     generate_pdf_from_text,
     generate_word_doc_from_text,
     generate_latex_pdf_from_transcipt,
+    generate_latex_pdf_from_summary,
     format_transcription,
     summarise_text_from_transcript,
     transcribe_audio
@@ -99,7 +100,7 @@ def background_generate_outputs(app, transcript, summary, filename, outputs):
                 if 'latex_summary' in outputs:
                     log_progress(filename, "Generating LaTeX summary PDF...", phase="phase2")
                     latex_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}-edited-summary-latex.pdf")
-                    generate_latex_pdf_from_transcipt(summary, latex_path)
+                    generate_latex_pdf_from_summary(summary, latex_path)
                     output_files.append((latex_path, "edited-summary-latex.pdf"))
                     tex_path = os.path.join(app.config['UPLOAD_FOLDER'], f"Math_Summary.tex")
                     output_files.append((tex_path, "edited-summary-latex.tex"))

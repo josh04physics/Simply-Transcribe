@@ -419,7 +419,7 @@ def upload_youtube_link():
         flash(f"Unexpected error: {e}", "danger")
         return redirect(url_for('index'))
 
-    # 🚀 Background processing
+    # Background processing
     filename = os.path.splitext(os.path.basename(audio_path))[0]
     thread = threading.Thread(target=background_process_file, args=(app, audio_path, filename, outputs))
     thread.start()
@@ -427,7 +427,6 @@ def upload_youtube_link():
     return render_template('processing.html', filename=filename)
 
 
-# app.py
 @app.route('/check_results/<filename>')
 @login_required
 def check_results(filename):
@@ -481,8 +480,6 @@ def download_ready(filename):
     return "", 202
 
 
-# app.py
-# Python
 @app.route('/download_zip/<filename>')
 @login_required
 def download_zip(filename):

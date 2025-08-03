@@ -367,10 +367,6 @@ def generate_latex_summary(transcript_text, output_dir="uploads", tex_filename="
 
 
 def clean_latex_unicode(text):
-    """
-    Replaces problematic Unicode characters in GPT output with LaTeX-safe equivalents.
-    Ensures math symbols are wrapped in $...$.
-    """
 
     replacements = {
         # Dashes and quotes (text mode)
